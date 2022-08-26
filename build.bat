@@ -1,0 +1,1 @@
+pyinstaller.exe --onefile --windowed --name "AccelExplorer" --icon="icons\icon.ico" main.py

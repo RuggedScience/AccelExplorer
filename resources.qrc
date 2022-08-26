@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/">
+    <file>icons/accel_icon.png</file>
+    <file>icons/freq_icon.png</file>
+    <file>icons/icon.ico</file>
+  </qresource>
+</RCC>
