@@ -135,8 +135,8 @@ dmypy.json
 .pytype/
 
 # Generated UI and resource files
-temp_reader/ui/*
-!temp_reader/ui/__init__.py
+app/ui/*
+!app/ui/__init__.py
 
 # 
 .vscode/*
