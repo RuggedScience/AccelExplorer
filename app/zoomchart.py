@@ -24,6 +24,7 @@ class ZoomChart(QChartView):
         self._tool_tip = self.add_callout(QPointF(0, 0), "")
         self._tool_tip.hide()
         self._prev_ranges: Dict[QValueAxis, Tuple[float, float]] = None
+        
 
     @property
     def tooltip(self) -> Callout:

@@ -1,47 +1,76 @@
 import csv
 import re
+import sys
+from typing import List, Type
 
 import pandas as pd
+
 
 class ParseError(Exception):
     pass
 
 class CSVParser:
-    __display_name__ = 'Generic CSV Parser (1000Hz sample)'
-
+    # These should be set by any subclasses
+    display_name = 'Generic'
+    sample_rate = None
+    header_row = None
+    
     def __init__(self, filename: str) -> None:
         self.filename = filename
-        self._sample_rate = None    
 
-    @property
-    def sample_rate(self) -> int:
-        return self._sample_rate
+    def parse(self) -> pd.DataFrame:
+        if self.header_row is None:
+            self.header_row = 1
 
-    def parse(self, header_row: int = 1) -> pd.DataFrame:
-        df = pd.read_csv(self.filename, header=header_row)
+        df = pd.read_csv(self.filename, header=self.header_row - 1)
+        df.columns = df.columns.str.replace(r'''[:,',",\s]+''', '_', regex=True)
         return df
 
 
 class NULabsCSVParser(CSVParser):
-    __display_name__ = 'NU Labs CSV parser'
+    display_name = 'NU Labs'
+    header_row = 16
+    sample_rate = 0
 
     def parse(self) -> pd.DataFrame:
-        sample_rate = None
-        header_row = None
         with open(self.filename, newline='') as csvfile:
             reader = csv.reader(csvfile)
             for row in reader:
                 name = row[0]
                 value = row[1]
                 if re.search('sample rate', name, re.IGNORECASE):
-                    sample_rate = int(value)
-
-                if 'X:' in name and 'Y:' in value:
-                    header_row = reader.line_num - 1
+                    self.sample_rate = int(value)
                     break
 
-        if sample_rate is None or header_row is None:
-            raise ParseError('CSV is not a valid NU Labs file')
+        if self.sample_rate == 0:
+            raise ParseError('Cound not find sample rate')
 
-        self._sample_rate = sample_rate
-        return super().parse(header_row)
+        return super().parse()
+
+class AllenCSVParser(CSVParser):
+    display_name = 'Allen'
+    header_row = 29
+    sample_rate = 0
+
+    def parse(self) -> pd.DataFrame:
+        with open(self.filename, newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                name = row[0]
+                value = row[1]
+                if re.search('sampling period', name, re.IGNORECASE):
+                    self.sample_rate = int(1 / float(value))
+                    break
+
+        if self.sample_rate == 0:
+            raise ParseError('Could not find sample rate')
+
+        df = super().parse()
+        df.columns.values[0] = "Time"
+        df.columns.values[1] = "Voltage"
+        df = df[['Time', 'Voltage']]
+        df["g_s"] = df['Voltage'].apply(lambda x: (6.6 - x) * 200)
+        df.drop('Voltage', axis=1, inplace=True)
+        return df
+
+parsers: List[Type[CSVParser]] = [CSVParser, NULabsCSVParser, AllenCSVParser]
