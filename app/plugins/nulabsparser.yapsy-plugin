@@ -1,0 +1,9 @@
+[Core]
+Name = NU Labs CSV Parser
+Module = nulabsparser
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Parse NU Labs CSV files
+Website = N/A

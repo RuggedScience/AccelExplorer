@@ -1,0 +1,9 @@
+[Core]
+Name = Allen CSV Parser
+Module = allenparser
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Parse CSV files genereated by Allen's sensor
+Website = N/A

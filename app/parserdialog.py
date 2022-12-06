@@ -1,13 +1,16 @@
+import os
 from typing import List
 
+from yapsy.PluginManager import PluginManager
 from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox, QTextEdit
 from PySide6.QtCore import QFileInfo, Qt
 from PySide6.QtGui import QBrush, QColor, QTextFormat, QTextCursor
 
-from pandas import DataFrame
+import pandas as pd
 
 from .ui.ui_parserdialog import Ui_Dialog
-from .csvparser import parsers, ParseError, CSVParser
+from .categories import CSVParser, ParseError
+from .utils import module_path
 
 class ParserDialog(QDialog):
     def __init__(self, filename: str, parent: QWidget = None) -> None:
@@ -16,9 +19,23 @@ class ParserDialog(QDialog):
         self.ui.setupUi(self)
 
         self.ui.buttonBox.button(QDialogButtonBox.Ok).setText("Parse")
-        
-        self.ui.typeComboBox.addItems([parser.display_name for parser in parsers])
-        self.ui.typeComboBox.currentIndexChanged.connect(self.typeChanged)
+
+        plugin_path = os.path.join(module_path(), 'plugins')
+        self.plugin_manager = PluginManager()
+        self.plugin_manager.setPluginPlaces([plugin_path, 'plugins', os.path.join('app', 'plugins')])
+        self.plugin_manager.setCategoriesFilter({"Parsers": CSVParser})
+
+        # Load plugins
+        self.plugin_manager.collectPlugins()
+        print(self.plugin_manager.getAllPlugins())
+
+        self.parsers = {'Generic Parser': CSVParser()}
+        for plugin in self.plugin_manager.getPluginsOfCategory("Parsers"):
+            self.parsers[plugin.plugin_object.name] = plugin.plugin_object
+
+        self.ui.typeComboBox.addItems(self.parsers.keys())
+
+        self.ui.typeComboBox.currentTextChanged.connect(self.typeChanged)
         self.ui.headerRowSpinBox.valueChanged.connect(self.headerRowChanged)
 
         self.setCSVFile(filename)
@@ -31,7 +48,7 @@ class ParserDialog(QDialog):
         return self.ui.sampleRateSpinBox.value()
 
     @property
-    def df(self) -> DataFrame:
+    def df(self) -> pd.DataFrame:
         return self._df
 
     def setCSVFile(self, filename: str) -> None:
@@ -45,15 +62,15 @@ class ParserDialog(QDialog):
 
         # Try all of the specific parsers to see
         # if any successfully parse the CSV file.
-        for i, parser_class in enumerate(parsers):
-            if i == 0:
+        for i, parser in enumerate(self.parsers.values()):
+            # If either one of these is none, the parser requires
+            # user input to properly work. Skip those.
+            if parser.sample_rate is None or parser.header_row is None:
                 continue
 
-            parser = parser_class(filename)
             try:
-                df = parser.parse()
-            except ParseError:
-                #self.ui.typeComboBox.setItemData(i, QBrush(Qt.red), Qt.ForegroundRole)
+                df = parser.parse(filename)
+            except (ParseError):
                 self.ui.typeComboBox.setItemData(i, QBrush(Qt.red), Qt.BackgroundRole)
                 continue
 
@@ -63,10 +80,10 @@ class ParserDialog(QDialog):
             self._df = df
 
 
-    def typeChanged(self, index: int) -> None:
-        parser_class = parsers[index]
-        self.ui.sampleRateSpinBox.setEnabled(parser_class.sample_rate is None)
-        self.ui.headerRowSpinBox.setEnabled(parser_class.header_row is None)
+    def typeChanged(self, text: str) -> None:
+        parser = self.parsers[text]
+        self.ui.sampleRateSpinBox.setEnabled(parser.sample_rate is None)
+        self.ui.headerRowSpinBox.setEnabled(parser.header_row is None)
         self._df = None
 
     def headerRowChanged(self, value: int) -> None:
@@ -89,20 +106,19 @@ class ParserDialog(QDialog):
         if self._df is not None:
             return super().accept()
 
-        index = self.ui.typeComboBox.currentIndex()
-        parser_class = parsers[index]
-        parser = parser_class(self._filename)
+        name = self.ui.typeComboBox.currentText()
+        parser = self.parsers[name]
 
         if self.ui.headerRowSpinBox.isEnabled():
             parser.header_row = self.ui.headerRowSpinBox.value()
 
         try: 
-            self._df = parser.parse()
+            self._df = parser.parse(self._filename)
         except ParseError as ex:
             print(ex)
             return
 
-        if index != 0:
+        if parser.sample_rate != None:
             self.ui.sampleRateSpinBox.setValue(parser.sample_rate)
 
         return super().accept()
