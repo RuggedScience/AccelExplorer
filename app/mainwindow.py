@@ -1,5 +1,5 @@
 import re
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 from collections.abc import Iterable
 import numpy as np
 import pandas as pd
@@ -193,22 +193,28 @@ class MainWindow(QMainWindow):
             accel_sw.setWindowFilePath(filename)
             accel_sw.setWindowIcon(accel_icon)
 
-    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        event.acceptProposedAction()
-
-    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
-        event.acceptProposedAction()
-
-    def dropEvent(self, event: QDropEvent) -> None:
+    def _get_supported_urls(self, event: QDropEvent) -> List[str]:
         urls = []
         mimeData = event.mimeData()
         if mimeData.hasUrls():
             for url in mimeData.urls():
                 if url.isLocalFile():
                     info = QFileInfo(url.toLocalFile())
-                    if re.search("csv", info.suffix(), re.IGNORECASE):
+                    if info.suffix().lower() in ParserDialog.supported_extensions():
                         urls.append(url.toLocalFile())
+        return urls
 
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        urls = self._get_supported_urls(event)
+        if urls:
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
+        event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        urls = self._get_supported_urls(event)
         if urls:
             event.acceptProposedAction()
             QTimer.singleShot(1, lambda: self.addCsvs(urls))

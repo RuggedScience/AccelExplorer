@@ -122,3 +122,7 @@ class ParserDialog(QDialog):
             self.ui.sampleRateSpinBox.setValue(parser.sample_rate)
 
         return super().accept()
+
+    @staticmethod
+    def supported_extensions() -> List[str]:
+        return ['csv']
