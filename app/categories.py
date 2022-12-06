@@ -7,11 +7,22 @@ class ParseError(Exception):
     pass
 
 
-class CSVParser(IPlugin):
-    name = "Generic Parser"
+class FileParser(IPlugin):
+    name = "Generic File Parser"
+
+    extension = None
 
     sample_rate = None
     header_row = None
+
+    def parse(self, filename: str, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError
+
+
+class CSVParser(FileParser):
+    name = "Genereic CSV Parser"
+
+    extension = 'csv'
 
     def parse(self, filename: str, **kwargs) -> pd.DataFrame:
         if self.header_row is None:
@@ -22,8 +33,14 @@ class CSVParser(IPlugin):
         return df
 
 
-class Filter(IPlugin):
+class DataFilter(IPlugin):
     name = "Base Filter"
 
     def filter(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        return df
+
+class DataView(IPlugin):
+    name = "Base Data View"
+
+    def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         return df

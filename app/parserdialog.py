@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from yapsy.PluginManager import PluginManager
+from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox, QTextEdit
 from PySide6.QtCore import QFileInfo, Qt
 from PySide6.QtGui import QBrush, QColor, QTextFormat, QTextCursor
@@ -10,7 +10,6 @@ import pandas as pd
 
 from .ui.ui_parserdialog import Ui_Dialog
 from .categories import CSVParser, ParseError
-from .utils import module_path
 
 class ParserDialog(QDialog):
     def __init__(self, filename: str, parent: QWidget = None) -> None:
@@ -20,18 +19,12 @@ class ParserDialog(QDialog):
 
         self.ui.buttonBox.button(QDialogButtonBox.Ok).setText("Parse")
 
-        plugin_path = os.path.join(module_path(), 'plugins')
-        self.plugin_manager = PluginManager()
-        self.plugin_manager.setPluginPlaces([plugin_path, 'plugins', os.path.join('app', 'plugins')])
-        self.plugin_manager.setCategoriesFilter({"Parsers": CSVParser})
-
-        # Load plugins
-        self.plugin_manager.collectPlugins()
-        print(self.plugin_manager.getAllPlugins())
-
+        pm: PluginManager = PluginManagerSingleton.get()
+    
         self.parsers = {'Generic Parser': CSVParser()}
-        for plugin in self.plugin_manager.getPluginsOfCategory("Parsers"):
-            self.parsers[plugin.plugin_object.name] = plugin.plugin_object
+        for plugin in pm.getPluginsOfCategory("Parsers"):
+            if isinstance(plugin.plugin_object, CSVParser):
+                self.parsers[plugin.plugin_object.name] = plugin.plugin_object
 
         self.ui.typeComboBox.addItems(self.parsers.keys())
 
