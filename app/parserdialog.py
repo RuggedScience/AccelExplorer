@@ -1,10 +1,9 @@
-import os
 from typing import List
 
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
-from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox, QTextEdit
+from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox
 from PySide6.QtCore import QFileInfo, Qt
-from PySide6.QtGui import QBrush, QColor, QTextFormat, QTextCursor
+from PySide6.QtGui import QBrush
 
 import pandas as pd
 
@@ -28,17 +27,15 @@ class ParserDialog(QDialog):
 
         self.ui.typeComboBox.addItems(self.parsers.keys())
 
-        self.ui.typeComboBox.currentTextChanged.connect(self.typeChanged)
-        self.ui.headerRowSpinBox.valueChanged.connect(self.headerRowChanged)
+        self.ui.typeComboBox.currentTextChanged.connect(self._typeChanged)
+        self.ui.timeUnitsComboBox.currentTextChanged.connect(self._update_ui)
+        self.ui.headerRowSpinBox.valueChanged.connect(self._headerRowChanged)
+        self.ui.csvViewer.lineNumberChanged.connect(self.ui.headerRowSpinBox.setValue)
 
         self.setCSVFile(filename)
-        self.headerRowChanged(self.ui.headerRowSpinBox.value())
+        self._headerRowChanged(self.ui.headerRowSpinBox.value())
 
         self._df = None
-    
-    @property
-    def sampleRate(self) -> int:
-        return self.ui.sampleRateSpinBox.value()
 
     @property
     def df(self) -> pd.DataFrame:
@@ -58,41 +55,44 @@ class ParserDialog(QDialog):
         for i, parser in enumerate(self.parsers.values()):
             # If either one of these is none, the parser requires
             # user input to properly work. Skip those.
-            if parser.sample_rate is None or parser.header_row is None:
+            if (parser.sample_rate is None and parser.time_units is None) or parser.header_row is None:
                 continue
 
             try:
-                df = parser.parse(filename)
+                self._df = parser.parse(filename)
+                self.ui.typeComboBox.setCurrentIndex(i)
+                self._update_ui()
+                break
             except (ParseError):
                 self.ui.typeComboBox.setItemData(i, QBrush(Qt.red), Qt.BackgroundRole)
                 continue
 
-            self.ui.sampleRateSpinBox.setValue(parser.sample_rate)
-            self.ui.headerRowSpinBox.setValue(parser.header_row)
-            self.ui.typeComboBox.setCurrentIndex(i)
-            self._df = df
-
-
-    def typeChanged(self, text: str) -> None:
-        parser = self.parsers[text]
-        self.ui.sampleRateSpinBox.setEnabled(parser.sample_rate is None)
-        self.ui.headerRowSpinBox.setEnabled(parser.header_row is None)
+    def _typeChanged(self) -> None:
         self._df = None
 
-    def headerRowChanged(self, value: int) -> None:
-        selection = QTextEdit.ExtraSelection()    
-        lineColor = QColor(Qt.yellow).lighter(160)
+        parser_type = self.ui.typeComboBox.currentText()
+        parser = self.parsers[parser_type]
 
-        selection.format.setBackground(lineColor)
-        selection.format.setProperty(QTextFormat.FullWidthSelection, True)
+        self.ui.timeUnitsComboBox.setCurrentText(parser.time_units or 'None')
+        
+        if parser.header_row:
+            self.ui.headerRowSpinBox.setValue(parser.header_row)
 
-        block = self.ui.csvViewer.document().findBlockByLineNumber(value - 1)
-        selection.cursor = QTextCursor(block)
-        selection.cursor.clearSelection()
+        self._update_ui()
 
-        self.ui.csvViewer.setExtraSelections([selection])
+    def _update_ui(self) -> None:
+        parser_type = self.ui.typeComboBox.currentText()
+        parser = self.parsers[parser_type]
 
-        self.ui.csvViewer.setTextCursor(selection.cursor);
+        self.ui.timeUnitsComboBox.setEnabled(parser.time_units is None)
+
+        time_units = self.ui.timeUnitsComboBox.currentText()
+        self.ui.sampleRateSpinBox.setEnabled(parser.sample_rate is None and time_units == 'None')
+
+        self.ui.headerRowSpinBox.setEnabled(parser.header_row is None)
+
+    def _headerRowChanged(self, value: int) -> None:
+        self.ui.csvViewer.setCurrentLine(value)
 
     def accept(self) -> None:
         # If the auto parsing worked we are done already.
@@ -101,6 +101,12 @@ class ParserDialog(QDialog):
 
         name = self.ui.typeComboBox.currentText()
         parser = self.parsers[name]
+
+        time_units = self.ui.timeUnitsComboBox.currentText()
+        if self.ui.timeUnitsComboBox.isEnabled() and time_units != 'None':
+            parser.time_units = time_units.lower()
+        else:
+            parser.sample_rate = self.ui.sampleRateSpinBox.value()
 
         if self.ui.headerRowSpinBox.isEnabled():
             parser.header_row = self.ui.headerRowSpinBox.value()
@@ -115,7 +121,3 @@ class ParserDialog(QDialog):
             self.ui.sampleRateSpinBox.setValue(parser.sample_rate)
 
         return super().accept()
-
-    @staticmethod
-    def supported_extensions() -> List[str]:
-        return ['csv']

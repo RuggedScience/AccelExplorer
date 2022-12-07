@@ -1,3 +1,5 @@
+__all__ = ['AllenCSVParser']
+
 import csv
 import re
 
@@ -23,10 +25,10 @@ class AllenCSVParser(CSVParser):
         if self.sample_rate == 0:
             raise ParseError('Could not find sample rate')
 
-        df = super().parse(filename, **kwargs)
+        df = pd.read_csv(filename, header=self.header_row - 1)
         df.columns.values[0] = "Time"
         df.columns.values[1] = "Voltage"
-        df = df[['Time', 'Voltage']]
+        df = df[['Voltage']]
         df["g_s"] = df['Voltage'].apply(lambda x: (6.6 - x) * 200)
         df.drop('Voltage', axis=1, inplace=True)
-        return df
+        return self._process_df(df)

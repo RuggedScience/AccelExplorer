@@ -1,0 +1,9 @@
+[Core]
+Name = FFT
+Module = fftview
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = FFT
+Website = N/A

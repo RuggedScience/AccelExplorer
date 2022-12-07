@@ -1,28 +1,35 @@
-import re
-from typing import Tuple, Union, List
+from typing import Tuple, List, NamedTuple
 from collections.abc import Iterable
-import numpy as np
-import pandas as pd
-from scipy import fft
 
+import pandas as pd
+import endaq as ed
+
+from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QWidget,
     QMdiSubWindow,
-    QVBoxLayout,
-    QHBoxLayout,
-    QCheckBox
+    QTreeWidgetItem,
+    QMenu,
+    QFileDialog,
 )
-from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QPixmap
-from PySide6.QtCore import QFileInfo, Qt, QPointF, QTimer
+from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, QCursor
+from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
 from PySide6.QtCharts import QValueAxis, QLineSeries
 
 from .ui import resources_rc
 from .ui.ui_mainwindow import Ui_MainWindow
-from .snapmdiarea import SnapMdiArea
 from .zoomchart import ZoomChart
 from .parserdialog import ParserDialog
+from .snapmdiarea import SnapMdiArea
+
+
+class ViewData(NamedTuple):
+    tree_item: QTreeWidgetItem
+    widget: ZoomChart
+    df: pd.DataFrame
+    window: QMdiSubWindow
 
 
 class MainWindow(QMainWindow):
@@ -36,6 +43,31 @@ class MainWindow(QMainWindow):
 
         self._mdi_area = SnapMdiArea(self)
         self.setCentralWidget(self._mdi_area)
+
+        self.ui.treeWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.ui.treeWidget.customContextMenuRequested.connect(
+            self._context_menu_requested
+        )
+        self.ui.treeWidget.currentItemChanged.connect(self._current_tree_item_changed)
+        self.ui.treeWidget.itemChanged.connect(self._tree_item_changed)
+
+        pm: PluginManager = PluginManagerSingleton.get()
+
+        self._filter_menu = QMenu("Filters")
+        for plugin in pm.getPluginsOfCategory("Filters"):
+            action = QAction(plugin.name, self)
+            action.setWhatsThis(plugin.description)
+            action.filter = plugin.plugin_object
+            self._filter_menu.addAction(action)
+
+        self._view_menu = QMenu("Views")
+        for plugin in pm.getPluginsOfCategory("Views"):
+            action = QAction(plugin.name, self)
+            action.setWhatsThis(plugin.description)
+            action.view = plugin.plugin_object
+            self._view_menu.addAction(action)
+
+        self._open_views: List[ViewData] = []
 
     def _add_subwindow(self, widget: QWidget) -> QMdiSubWindow:
         sub_window = self._mdi_area.addSubWindow(widget)
@@ -54,73 +86,70 @@ class MainWindow(QMainWindow):
         y_range: Tuple[float, float] = None,
         x_title: str = None,
         y_title: str = None,
-    ) -> QMdiSubWindow:
-
-        widget = QWidget(self)
-        vlayout = QVBoxLayout()
-        widget.setLayout(vlayout)
-        hlayout = QHBoxLayout()
-        vlayout.addLayout(hlayout)
-
+    ) -> ZoomChart:
         chart_view = ZoomChart(self)
         chart = chart_view.chart()
         # chart.legend().hide()
-        vlayout.addWidget(chart_view)
 
         def point_hovered(pos: QPointF, state: bool):
             if state:
                 chart_view.show_tooltip(
-                    pos, f"Frequency: {pos.x():.2f}\nMagnitude: {pos.y():.2f}"
+                    pos, f"{x_title}: {pos.x():.2f}\n{y_title}: {pos.y():.2f}"
                 )
             else:
                 chart_view.tooltip.hide()
 
-        x = df.iloc(axis=1)[0]
+        x = df.index
         x_axis = QValueAxis()
 
         if x_title:
             x_axis.setTitleText(x_title)
+        else:
+            x_axis.setTitleText(x.name)
 
         if x_range:
             x_axis.setRange(*x_range)
         else:
-            x_axis.setRange(x.min(), x.max())
+            if isinstance(x, pd.TimedeltaIndex):
+                x_axis.setRange(x.min().total_seconds(), x.max().total_seconds())
+            else:
+                x_axis.setRange(x[0], x[-1])
 
         y_axis = QValueAxis()
 
         if y_title:
             y_axis.setTitleText(y_title)
 
-        y_dfs = df.iloc[:, 1:]
         if y_range:
             y_axis.setRange(*y_range)
         else:
             # Add some margin to the y axis
-            y_min = y_dfs.min(axis=1).min()
-            y_max = y_dfs.max(axis=1).max()
+            y_min = df.min(axis=1).min()
+            y_max = df.max(axis=1).max()
             y_axis.setRange(y_min - abs(y_min * 0.1), y_max + abs(y_max * 0.1))
 
         chart.addAxis(x_axis, Qt.AlignBottom)
         chart.addAxis(y_axis, Qt.AlignLeft)
 
-        points = {column: [] for column in y_dfs}
+        for col, data in df.items():
+            points = []
+            for index, value in data.items():
+                if isinstance(index, pd.Timedelta):
+                    x = float(index.total_seconds())
+                else:
+                    x = float(index)
 
-        for row in df.itertuples(index=False):
-            for column in y_dfs:
-                x = float(row[0])
-                y = float(getattr(row, column))
-                points[column].append(QPointF(x, y))
+                y = float(value)
+                points.append(QPointF(x, y))
 
-        for column in y_dfs:
-            data = points[column]
             series = QLineSeries()
-            series.setName(column)
-            # series.setUseOpenGL(True)
+            series.setName(col)
+            series.setUseOpenGL(True)
 
             chart.addSeries(series)
             series.attachAxis(x_axis)
             series.attachAxis(y_axis)
-            series.replace(data)
+            series.replace(points)
 
             pen = series.pen()
             pen.setWidth(4)
@@ -129,13 +158,6 @@ class MainWindow(QMainWindow):
             series.hovered.connect(point_hovered)
             series.clicked.connect(chart_view.keep_tooltip)
 
-            check_box = QCheckBox(column)
-            check_box.setChecked(True)
-            check_box.stateChanged.connect(series.setVisible)
-            hlayout.addWidget(check_box)
-
-        sub_window = self._add_subwindow(widget)
-
         if not callouts is None:
             for _, row in callouts.iterrows():
                 pos = QPointF(row["freq"], row["mag"])
@@ -143,78 +165,175 @@ class MainWindow(QMainWindow):
                     pos, f"Frequency: {pos.x():.2f}\nMagnitude: {pos.y():.2f}"
                 )
 
-        return sub_window
+        return chart_view
 
-    def addCsvs(self, filenames: Union[str, Iterable[str]]) -> None:
-        if not isinstance(filenames, Iterable):
-            filenames = [filenames]
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if isinstance(watched, QMdiSubWindow) and event.type() == QEvent.Close:
+            for view in self._open_views:
+                if view.window == watched:
+                    self._remove_view(view)
 
-        for filename in filenames:
-            dlg = ParserDialog(filename, self)
-            if not dlg.exec():
-                continue
-            accel_df = dlg.df
+        return super().eventFilter(watched, event)
 
-            fft_df = None
-            for (name, data) in accel_df.iloc[:, 1:].iteritems():
+    def _remove_view(self, view: ViewData):
+        self.ui.treeWidget.invisibleRootItem().removeChild(view.tree_item)
+        self._open_views.remove(view)
 
-                yf = fft.fft(data.values)
+    def _add_view(
+        self, name: str, df: pd.DataFrame, x_title: str, y_title: str
+    ) -> ViewData:
+        chart = self._add_chart(df, x_title=x_title, y_title=y_title)
+        chart.chart().setTitle(name)
+        tree_item = QTreeWidgetItem()
+        tree_item.setText(0, name)
+        tree_item.setFlags(tree_item.flags() | Qt.ItemIsAutoTristate)
+        tree_item.setExpanded(True)
+        self.ui.treeWidget.addTopLevelItem(tree_item)
+        sw = self._add_subwindow(chart)
+        sw.setWindowTitle(name)
+        sw.installEventFilter(self)
 
-                if fft_df is None:
-                    # Generate the frequency bin for x axis
-                    x = fft.fftfreq(yf.size, 1 / dlg.sampleRate)
-                    # We only want the first half since the data is mirrored
-                    x = x[: int(len(x) / 2)]
-                    fft_df = pd.DataFrame({"freq": x})
+        for series in chart.chart().series():
+            series_item = QTreeWidgetItem(tree_item)
+            series_item.setText(0, series.name())
+            series_item.setCheckState(0, Qt.Checked)
+            series_item.series = series
 
-                # Calclulate the magnitude
-                y: np.ndarray = (np.abs(yf) * 1.0 / yf.size) * 2.0
-                # Keep the length the same as x
-                y = y[: fft_df["freq"].size]
-                fft_df[name] = y
+        data = ViewData(tree_item=tree_item, widget=chart, df=df, window=sw)
+        self._open_views.append(data)
+        return data
 
-            # Drop the "0hz" frequency since that's not real
-            fft_df = fft_df.iloc[1:, :]
-            fft_sw = self._add_chart(
-                fft_df, x_title="Frequency (Hz)", y_title="Magnitude"
-            )
-            accel_sw = self._add_chart(
-                accel_df, x_title="Time (ms)", y_title="Acceleration (g)"
-            )
+    def _add_files(self, files: Iterable[QFileInfo]) -> None:
+        for file in files:
+            if file.suffix().lower() == "ide":
+                df = ed.ide.get_primary_sensor_data(
+                    name=file.absoluteFilePath(), measurement_type=ed.ide.ACCELERATION
+                )
+                s = df.index.to_series()
+                st = s[0]
+                s = s.apply(lambda x: x - st)
+                df.index = s
+            elif file.suffix().lower() == "h5":
+                df = pd.read_hdf(file.absoluteFilePath())
+            else:
+                dlg = ParserDialog(file.absoluteFilePath(), self)
+                if not dlg.exec():
+                    continue
+                df = dlg.df
 
-            fft_icon = QIcon(QPixmap(":/icons/freq_icon.png"))
-            accel_icon = QIcon(QPixmap(":/icons/accel_icon.png"))
+            self._add_view(file.fileName(), df, df.index.name, "Acceleration (g's)")
 
-            info = QFileInfo(filename)
-            fft_sw.setWindowTitle(f"FFT - {info.fileName()}")
-            fft_sw.setWindowFilePath(filename)
-            fft_sw.setWindowIcon(fft_icon)
-            accel_sw.setWindowTitle(f"Accel - {info.fileName()}")
-            accel_sw.setWindowFilePath(filename)
-            accel_sw.setWindowIcon(accel_icon)
-
-    def _get_supported_urls(self, event: QDropEvent) -> List[str]:
-        urls = []
+    def _get_supported_files(self, event: QDropEvent) -> List[QFileInfo]:
+        files = []
         mimeData = event.mimeData()
         if mimeData.hasUrls():
             for url in mimeData.urls():
                 if url.isLocalFile():
                     info = QFileInfo(url.toLocalFile())
-                    if info.suffix().lower() in ParserDialog.supported_extensions():
-                        urls.append(url.toLocalFile())
-        return urls
-
+                    if info.suffix().lower() in ("csv", "ide", "h5"):
+                        files.append(info)
+        return files
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        urls = self._get_supported_urls(event)
-        if urls:
+        files = self._get_supported_files(event)
+        if files:
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
         event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent) -> None:
-        urls = self._get_supported_urls(event)
-        if urls:
+        files = self._get_supported_files(event)
+        if files:
             event.acceptProposedAction()
-            QTimer.singleShot(1, lambda: self.addCsvs(urls))
+            QTimer.singleShot(1, lambda: self._add_files(files))
+
+    def _context_menu_requested(self, pos: QPoint) -> None:
+        item = self.ui.treeWidget.itemAt(pos)
+
+        menu = QMenu(self)
+
+        export_action = QAction("Export")
+        menu.addAction(export_action)
+
+        if self._filter_menu.actions():
+            menu.addMenu(self._filter_menu)
+
+        if self._view_menu.actions():
+            menu.addMenu(self._view_menu)
+
+        action = menu.exec(QCursor.pos())
+        if not action:
+            return
+
+        df = self._get_df_from_tree_item(item)
+        if df is None:
+            return
+
+        if action is export_action:
+            fileName, filter = QFileDialog.getSaveFileName(
+                self, "Export File", None, "HDFS (*.h5);;CSV (*.csv)"
+            )
+            if fileName:
+                if "csv" in filter:
+                    df.to_csv(fileName)
+                else:
+                    df.to_hdf(fileName, key=item.text(0), mode="w")
+            pass
+        elif hasattr(item, "series"):
+            name = item.series.name()
+            input_df = df[name].to_frame()
+        else:
+            input_df = df
+
+        if hasattr(action, "view"):
+            new_df = action.view.generate(input_df)
+            name = action.view.name
+            self._add_view(
+                f"{name} - {item.text(0)}",
+                new_df,
+                new_df.index.name,
+                action.view.y_title,
+            )
+        elif hasattr(action, "filter"):
+            new_df = action.filter.filter(input_df)
+            name = action.filter.name
+            self._add_view(
+                f"{name} - {item.text(0)}", new_df, new_df.index.name, "Test"
+            )
+
+    def _current_tree_item_changed(self, current: QTreeWidgetItem, _) -> None:
+        data = self._get_view_from_tree_item(current)
+        if data is None:
+            return
+
+        self._view_menu.setEnabled((data.df is not None))
+
+    def _tree_item_changed(self, item: QTreeWidgetItem, column: int):
+        if column == 0 and hasattr(item, "series"):
+            item.series.setVisible(item.checkState(0) == Qt.Checked)
+
+    def _get_root_parent(self, item):
+        while item and item.parent() is not None:
+            item = item.parent()
+        return item
+
+    def _get_view_from_tree_item(self, item: QTreeWidgetItem) -> ViewData:
+        item = self._get_root_parent(item)
+        if item:
+            for view in self._open_views:
+                if view.tree_item is item:
+                    return view
+        return None
+
+    def _get_df_from_tree_item(self, item: QTreeWidgetItem) -> pd.DataFrame:
+        view = self._get_view_from_tree_item(item)
+        if view:
+            if view.tree_item is item:
+                return view.df
+
+            for col in view.df:
+                if col == item.text(0):
+                    return view.df[col].to_frame()
+
+        return None

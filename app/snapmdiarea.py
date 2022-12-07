@@ -59,6 +59,9 @@ class SnapMdiArea(QMdiArea):
         new_size = resizeEvent.size()
         windows = []
         for window in self.subWindowList():
+            if window.isMaximized():
+                continue
+
             rect = window.geometry()
             # TODO: This should be more general to support quadrant snapping in the future.
 

@@ -1,0 +1,9 @@
+[Core]
+Name = SRS
+Module = srsview
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Shock Response Spectrum
+Website = N/A
