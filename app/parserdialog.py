@@ -22,7 +22,7 @@ class ParserDialog(QDialog):
         pm = get_plugin_manager()
         pm.setCategoriesFilter({"Parsers": CSVParser})
         pm.collectPlugins()
-    
+
         self.parsers = {"Generic Parser": CSVParser()}
         for plugin in pm.getPluginsOfCategory("Parsers"):
             if isinstance(plugin.plugin_object, CSVParser):
@@ -55,29 +55,30 @@ class ParserDialog(QDialog):
 
         # Try all of the specific parsers to see
         # if any successfully parse the CSV file.
+
+        found = False
         for i, parser in enumerate(self.parsers.values()):
             # If either one of these is none, the parser requires
             # user input to properly work. Skip those.
-            if (parser.sample_rate is None and parser.time_units is None) or parser.header_row is None:
+            if (
+                parser.sample_rate is None and parser.time_units is None
+            ) or parser.header_row is None:
                 continue
 
-            try:
-                self._df = parser.parse(filename)
-                self.ui.typeComboBox.setCurrentIndex(i)
-                self._update_ui()
-                break
-            except (ParseError):
+            if parser.can_parse(filename):
+                if not found:
+                    self.ui.typeComboBox.setCurrentIndex(i)
+                    self._update_ui()
+                    found = True
+            else:
                 self.ui.typeComboBox.setItemData(i, QBrush(Qt.red), Qt.BackgroundRole)
-                continue
 
     def _typeChanged(self) -> None:
-        self._df = None
-
         parser_type = self.ui.typeComboBox.currentText()
         parser = self.parsers[parser_type]
 
-        self.ui.timeUnitsComboBox.setCurrentText(parser.time_units or 'None')
-        
+        self.ui.timeUnitsComboBox.setCurrentText(parser.time_units or "None")
+
         if parser.header_row:
             self.ui.headerRowSpinBox.setValue(parser.header_row)
 
@@ -90,7 +91,9 @@ class ParserDialog(QDialog):
         self.ui.timeUnitsComboBox.setEnabled(parser.time_units is None)
 
         time_units = self.ui.timeUnitsComboBox.currentText()
-        self.ui.sampleRateSpinBox.setEnabled(parser.sample_rate is None and time_units == 'None')
+        self.ui.sampleRateSpinBox.setEnabled(
+            parser.sample_rate is None and time_units == "None"
+        )
 
         self.ui.headerRowSpinBox.setEnabled(parser.header_row is None)
 
@@ -98,15 +101,11 @@ class ParserDialog(QDialog):
         self.ui.csvViewer.setCurrentLine(value)
 
     def accept(self) -> None:
-        # If the auto parsing worked we are done already.
-        if self._df is not None:
-            return super().accept()
-
         name = self.ui.typeComboBox.currentText()
         parser = self.parsers[name]
 
         time_units = self.ui.timeUnitsComboBox.currentText()
-        if self.ui.timeUnitsComboBox.isEnabled() and time_units != 'None':
+        if self.ui.timeUnitsComboBox.isEnabled() and time_units != "None":
             parser.time_units = time_units.lower()
         else:
             parser.sample_rate = self.ui.sampleRateSpinBox.value()
@@ -114,7 +113,7 @@ class ParserDialog(QDialog):
         if self.ui.headerRowSpinBox.isEnabled():
             parser.header_row = self.ui.headerRowSpinBox.value()
 
-        try: 
+        try:
             self._df = parser.parse(self._filename)
         except ParseError as ex:
             print(ex)

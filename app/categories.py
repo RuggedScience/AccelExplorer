@@ -10,7 +10,7 @@ class ParseError(Exception):
 class CSVParser:
     name = "Generic CSV Parser"
 
-    extension = 'csv'
+    extension = "csv"
 
     header_row = None
     sample_rate = None
@@ -18,12 +18,12 @@ class CSVParser:
 
     def _process_df(self, df: pd.DataFrame) -> pd.DataFrame:
         # Cleanup column names. Fixes issues with DataFrame.itertuples.
-        df.columns = df.columns.str.replace(r'''[:,',",\s]+''', '_', regex=True)
+        df.columns = df.columns.str.replace(r"""[:,',",\s]+""", "_", regex=True)
 
         if self.time_units:
             # Assume time is the first column
             time_axis = df.iloc(axis=1)[0].name
-            if self.time_units == 'timestamp':
+            if self.time_units == "timestamp":
                 df[time_axis] = pd.to_timedelta(df[time_axis])
             else:
                 start_time = df[time_axis][0]
@@ -39,10 +39,13 @@ class CSVParser:
                 inplace=True,
             )
 
-        df.index.rename('Time (s)', inplace=True)
+        df.index.rename("Time (s)", inplace=True)
         return df
 
-    def parse(self, filename: str, **kwargs) -> pd.DataFrame:
+    def can_parse(self, filename: str) -> bool:
+        return False
+
+    def parse(self, filename: str) -> pd.DataFrame:
         if self.header_row is None:
             self.header_row = 1
 
@@ -58,6 +61,7 @@ class DataFilter:
 
     def filter(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         return df
+
 
 class DataView:
     name = "Base Data View"
