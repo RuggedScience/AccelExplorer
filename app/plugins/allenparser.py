@@ -14,12 +14,12 @@ class AllenCSVParser(CSVParser):
 
     def _get_sample_rate(self, filename: str) -> int:
         sample_rate_row = linecache.getline(filename=filename, lineno=22).lower()
-        try:
-            if sample_rate_row.startswith("sampling period"):
-                value = sample_rate_row.split(",")[1]
+        if sample_rate_row.startswith("sampling period"):
+            value = sample_rate_row.split(",")[1]
+            try:
                 return int(1 / float(value))
-        except:
-            pass
+            except:
+                pass
 
         raise ParseError("Could not find sample rate")
 
@@ -28,7 +28,6 @@ class AllenCSVParser(CSVParser):
             self._get_sample_rate(filename)
         except:
             return False
-
         return True
 
     def parse(self, filename: str) -> pd.DataFrame:

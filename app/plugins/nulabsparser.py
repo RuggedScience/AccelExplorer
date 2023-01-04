@@ -10,14 +10,27 @@ from app.categories import CSVParser, ParseError
 class NULabsCSVParser(CSVParser):
     name = "NU Labs"
     header_row = 16
-    time_units = "Milliseconds"
+    sample_rate = 0
+
+    def _get_sample_rate(self, filename: str) -> int:
+        sample_rate_row = linecache.getline(filename, 8).lower()
+        if sample_rate_row.startswith("sample rate"):
+            value = sample_rate_row.split(",")[1]
+            try:
+                return int(value)
+            except:
+                pass
+
+        raise ParseError("Could not find sample rate")
 
     def can_parse(self, filename: str) -> bool:
-        sample_rate_row = linecache.getline(filename, 8).lower()
-        return sample_rate_row.startswith("sample rate")
+        try:
+            self._get_sample_rate(filename)
+        except:
+            return False
+        return True
 
     def parse(self, filename: str) -> pd.DataFrame:
-        if not self.can_parse(filename):
-            raise ParseError("Cound not find sample rate")
-
-        return super().parse(filename)
+        self.sample_rate = self._get_sample_rate(filename)
+        df = super().parse(filename)
+        return df.iloc[:, 1:]
