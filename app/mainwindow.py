@@ -147,7 +147,10 @@ class MainWindow(QMainWindow):
 
             series = QLineSeries()
             series.setName(col)
-            series.setUseOpenGL(True)
+
+            # Only use OpenGL with large datasets
+            if len(points) > 100000:
+                series.setUseOpenGL(True)
 
             chart.addSeries(series)
             series.attachAxis(x_axis)
