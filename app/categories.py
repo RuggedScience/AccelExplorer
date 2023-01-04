@@ -34,7 +34,10 @@ class CSVParser:
             df.set_index(time_axis, drop=True, inplace=True)
         elif self.sample_rate:
             spacing = 1 / self.sample_rate
-            df.set_index(pd.to_timedelta([spacing * i for i in range(len(df))], unit='S'))
+            df.set_index(
+                pd.to_timedelta([spacing * i for i in range(len(df))], unit="S"),
+                inplace=True,
+            )
 
         df.index.rename('Time (s)', inplace=True)
         return df
