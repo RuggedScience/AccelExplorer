@@ -4,7 +4,6 @@ from collections.abc import Iterable
 import pandas as pd
 import endaq as ed
 
-from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -18,6 +17,8 @@ from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, 
 from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
 from PySide6.QtCharts import QValueAxis, QLineSeries
 
+from .utils import get_plugin_manager
+from .categories import DataFilter, DataView
 from .ui import resources_rc
 from .ui.ui_mainwindow import Ui_MainWindow
 from .zoomchart import ZoomChart
@@ -51,7 +52,9 @@ class MainWindow(QMainWindow):
         self.ui.treeWidget.currentItemChanged.connect(self._current_tree_item_changed)
         self.ui.treeWidget.itemChanged.connect(self._tree_item_changed)
 
-        pm: PluginManager = PluginManagerSingleton.get()
+        pm = get_plugin_manager()
+        pm.setCategoriesFilter({"Filters": DataFilter, "Views": DataView})
+        pm.collectPlugins()
 
         self._filter_menu = QMenu("Filters")
         for plugin in pm.getPluginsOfCategory("Filters"):

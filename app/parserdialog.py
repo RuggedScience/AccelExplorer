@@ -1,14 +1,15 @@
 from typing import List
 
-from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox
 from PySide6.QtCore import QFileInfo, Qt
 from PySide6.QtGui import QBrush
 
 import pandas as pd
 
+from .utils import get_plugin_manager
 from .ui.ui_parserdialog import Ui_Dialog
 from .categories import CSVParser, ParseError
+
 
 class ParserDialog(QDialog):
     def __init__(self, filename: str, parent: QWidget = None) -> None:
@@ -18,9 +19,11 @@ class ParserDialog(QDialog):
 
         self.ui.buttonBox.button(QDialogButtonBox.Ok).setText("Parse")
 
-        pm: PluginManager = PluginManagerSingleton.get()
+        pm = get_plugin_manager()
+        pm.setCategoriesFilter({"Parsers": CSVParser})
+        pm.collectPlugins()
     
-        self.parsers = {'Generic Parser': CSVParser()}
+        self.parsers = {"Generic Parser": CSVParser()}
         for plugin in pm.getPluginsOfCategory("Parsers"):
             if isinstance(plugin.plugin_object, CSVParser):
                 self.parsers[plugin.plugin_object.name] = plugin.plugin_object
