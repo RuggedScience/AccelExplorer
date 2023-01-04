@@ -65,7 +65,8 @@ class DataFilter:
 
 class DataView:
     name = "Base Data View"
-    y_title = "Acceleration (g's)"
+    x_title = ""
+    y_title = ""
 
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df

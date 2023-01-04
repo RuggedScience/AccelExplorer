@@ -9,6 +9,8 @@ from app.categories import DataView
 
 class FFTView(DataView):
     name = "FFT"
+    x_title = "Frequency"
+    y_title = "Magnitude"
 
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
         N = len(df)
