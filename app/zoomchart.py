@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 
 from PySide6.QtCharts import QChartView, QValueAxis
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QCursor, QKeyEvent, QMouseEvent, QResizeEvent, QWheelEvent
 from PySide6.QtWidgets import QApplication
 
@@ -24,7 +24,8 @@ class ZoomChart(QChartView):
         self._tool_tip = self.add_callout(QPointF(0, 0), "")
         self._tool_tip.hide()
         self._prev_ranges: Dict[QValueAxis, Tuple[float, float]] = None
-        
+
+        self._last_mouse_pos = None
 
     @property
     def tooltip(self) -> Callout:
@@ -111,6 +112,9 @@ class ZoomChart(QChartView):
         if event.buttons() & Qt.MiddleButton or (
             event.buttons() & Qt.LeftButton and control_pressed()
         ):
+            if self._last_mouse_pos is None:
+                self._last_mouse_pos = event.pos()
+
             d_pos = event.pos() - self._last_mouse_pos
 
             if self.rubberBand() & QChartView.HorizontalRubberBand:
@@ -126,6 +130,7 @@ class ZoomChart(QChartView):
             return super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._last_mouse_pos = None
         QApplication.restoreOverrideCursor()
         super().mouseReleaseEvent(event)
         # This handles cases where the rubber band tool was
