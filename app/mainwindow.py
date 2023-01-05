@@ -17,7 +17,7 @@ from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, 
 from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
 from PySide6.QtCharts import QValueAxis, QLineSeries, QChart
 
-from .utils import get_plugin_manager
+from .utils import get_plugin_manager, timing
 from .categories import DataFilter, DataView
 from .ui import resources_rc
 from .ui.ui_mainwindow import Ui_MainWindow
@@ -238,13 +238,13 @@ class MainWindow(QMainWindow):
     def _add_files(self, files: Iterable[QFileInfo]) -> None:
         for file in files:
             if file.suffix().lower() == "ide":
-                df = ed.ide.get_primary_sensor_data(
+                df: pd.DataFrame = ed.ide.get_primary_sensor_data(
                     name=file.absoluteFilePath(), measurement_type=ed.ide.ACCELERATION
                 )
-                s = df.index.to_series()
-                st = s[0]
-                s = s.apply(lambda x: x - st)
-                df.index = s
+                # Convert index from datetime to timedelta
+                series = df.index.to_series()
+                df.index = series - series[0]
+
             elif file.suffix().lower() == "h5":
                 df = pd.read_hdf(file.absoluteFilePath())
             else:
