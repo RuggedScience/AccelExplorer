@@ -82,18 +82,6 @@ class MainWindow(QMainWindow):
             self._mdi_area.tileSubWindows()
         return sub_window
 
-    def _generate_series_data(self, series: pd.Series) -> List[QPointF]:
-        points = []
-        for index, value in series.items():
-            if isinstance(index, pd.Timedelta):
-                x = float(index.total_seconds())
-            else:
-                x = float(index)
-
-            y = float(value)
-            points.append(QPointF(x, y))
-        return points
-
     def _replace_chart_data(self, df: pd.DataFrame, chart: QChart) -> List[QLineSeries]:
         x_axis = chart.axisX()
         y_axis = chart.axisY()
@@ -115,7 +103,7 @@ class MainWindow(QMainWindow):
                 series.attachAxis(y_axis)
                 new_series.append(series)
 
-            points = self._generate_series_data(data)
+            points = _generate_series_data(data)
             series.replace(points)
 
             # Only use OpenGL with large datasets
@@ -406,3 +394,10 @@ class MainWindow(QMainWindow):
                     return view.df[col].to_frame()
 
         return None
+
+
+def _generate_series_data(series: pd.Series) -> List[QPointF]:
+    if series.index.inferred_type == "timedelta64":
+        series.index = series.index.total_seconds()
+
+    return [QPointF(float(i), float(v)) for i, v in series.items()]
