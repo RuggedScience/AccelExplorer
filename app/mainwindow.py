@@ -304,8 +304,11 @@ class MainWindow(QMainWindow):
         if df is None:
             return
 
+        data = self._get_view_from_tree_item(item)
+        if data is None:
+            return
+
         if action is crop_action:
-            data = self._get_view_from_tree_item(item)
             chart = data.widget.chart()
             x_axis = chart.axisX()
             y_axis = chart.axisY()
@@ -321,20 +324,27 @@ class MainWindow(QMainWindow):
 
             pass
         elif action is export_action:
+            suggested_name = item.text(0).split(".")[0]
             fileName, filter = QFileDialog.getSaveFileName(
-                self, "Export File", None, "HDFS (*.h5);;CSV (*.csv)"
+                self, "Export File", suggested_name, "HDFS (*.h5);;CSV (*.csv)"
             )
             if fileName:
                 if "csv" in filter:
                     df.to_csv(fileName)
                 else:
-                    df.to_hdf(fileName, key=item.text(0), mode="w")
+                    # Clean up the key so it doesn't yell about natural naming...
+                    suggested_name = suggested_name.replace(" - ", "_")
+                    suggested_name = suggested_name.replace("-", "_")
+                    suggested_name = suggested_name.replace(" ", "_")
+                    df.to_hdf(fileName, key=suggested_name, mode="w")
             pass
         elif hasattr(item, "series"):
             name = item.series.name()
             input_df = df[name].to_frame()
+            item_text = f"{data.tree_item.text(0)} ({item.text(0)} only)"
         else:
             input_df = df
+            item_text = item.text(0)
 
         if hasattr(action, "view"):
             params = {}
@@ -347,7 +357,7 @@ class MainWindow(QMainWindow):
             new_df = action.view.generate(input_df, **params)
             name = action.view.name
             self._add_view(
-                f"{name} - {item.text(0)}",
+                f"{name} - {item_text}",
                 new_df,
                 action.view.x_title,
                 action.view.y_title,
