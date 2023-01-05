@@ -1,7 +1,5 @@
 import pandas as pd
-import numpy as np
-from scipy.fft import fft, fftfreq
-from endaq.calc.utils import sample_spacing
+import endaq as ed
 
 
 from app.categories import DataView
@@ -13,24 +11,7 @@ class FFTView(DataView):
     y_title = "Magnitude"
 
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
-        N = len(df)
-        spacing = sample_spacing(df)
-
-        freq = fftfreq(N, spacing)[: N // 2]
-
-        df_fft = pd.DataFrame()
-        for name in df.columns:
-            yf = fft(df[name].values)
-            y_plot = 2.0 / N * np.abs(yf[0 : N // 2])
-
-            df_fft = pd.concat(
-                [
-                    df_fft,
-                    pd.DataFrame(
-                        {"Frequency (Hz)": freq[1:], name: y_plot[1:]}
-                    ).set_index("Frequency (Hz)"),
-                ],
-                axis=1,
-            )
-
-        return df_fft
+        fft: pd.DataFrame = ed.calc.fft.fft(df)
+        # Remove all negative frequencies since it's a mirror
+        fft = fft[fft.index >= 1]
+        return fft
