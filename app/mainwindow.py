@@ -24,6 +24,7 @@ from .ui.ui_mainwindow import Ui_MainWindow
 from .zoomchart import ZoomChart
 from .parserdialog import ParserDialog
 from .snapmdiarea import SnapMdiArea
+from .optionsdialog import OptionsDialog
 
 
 class ViewData(NamedTuple):
@@ -301,15 +302,20 @@ class MainWindow(QMainWindow):
             input_df = df
 
         if hasattr(action, "view"):
-            new_df = action.view.generate(input_df)
+            params = {}
+            options = action.view.options
+            if options:
+                dlg = OptionsDialog(options, self)
+                if dlg.exec():
+                    params = dlg.values
+
+            new_df = action.view.generate(input_df, **params)
             name = action.view.name
             self._add_view(
                 f"{name} - {item.text(0)}",
                 new_df,
                 action.view.x_title,
                 action.view.y_title,
-                action.view.x_range,
-                action.view.y_range,
             )
         elif hasattr(action, "filter"):
             new_df = action.filter.filter(input_df)

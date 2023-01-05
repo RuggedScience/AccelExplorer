@@ -1,8 +1,10 @@
+from typing import Dict
+
 import pandas as pd
 import endaq as ed
 
 
-from app.categories import DataView
+from app.categories import DataView, DataOption
 
 
 class FFTView(DataView):
@@ -10,11 +12,16 @@ class FFTView(DataView):
     x_title = "Frequency"
     y_title = "Magnitude"
 
-    def generate(self, df: pd.DataFrame) -> pd.DataFrame:
+    def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+        min_x = kwargs.get("min_freq", 10)
+        max_x = kwargs.get("max_freq", 1000)
+
         fft: pd.DataFrame = ed.calc.fft.fft(df)
-        # Remove all negative frequencies since it's a mirror
-        fft = fft[fft.index >= 1]
-        # If the max frequency is less than the default max x value
-        # update the max x value to the max frequency
-        self.x_range = (0, min(self.x_range[1], fft.index.max()))
-        return fft
+        return fft[(fft.index >= min_x) & (fft.index <= max_x)]
+
+    @property
+    def options(self) -> Dict[str, DataOption]:
+        return {
+            "min_freq": DataOption("Min Frequency", 10, 1, None),
+            "max_freq": DataOption("Max Frequency", 1000, 1, None),
+        }

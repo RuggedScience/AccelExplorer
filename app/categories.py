@@ -1,4 +1,5 @@
-from typing import Dict
+from typing import Dict, List
+from collections import namedtuple
 
 import pandas as pd
 
@@ -53,6 +54,9 @@ class CSVParser:
         return self._process_df(df)
 
 
+DataOption = namedtuple("DataOption", ["name", "value", "min", "max"])
+
+
 class DataFilter:
     name = "Base Data Filter"
 
@@ -69,12 +73,10 @@ class DataView:
     # Titles for the x and y axes displayed on the chart
     x_title = ""
     y_title = ""
-    # Default range to initially display. Set to None for auto ranging
-    x_range = (0, 1000)
-    y_range = None
-    # Dict of options to be used by the generate function.
-    # TODO: Display dialog to set options if available
-    options = None
 
-    def generate(self, df: pd.DataFrame) -> pd.DataFrame:
+    def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         return df
+
+    @property
+    def options(self) -> Dict[str, DataOption]:
+        return {}
