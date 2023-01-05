@@ -298,7 +298,7 @@ class MainWindow(QMainWindow):
             self._add_view(
                 f"{name} - {item.text(0)}",
                 new_df,
-                new_df.index.name,
+                action.view.x_title,
                 action.view.y_title,
             )
         elif hasattr(action, "filter"):
