@@ -186,9 +186,17 @@ class MainWindow(QMainWindow):
         self._open_views.remove(view)
 
     def _add_view(
-        self, name: str, df: pd.DataFrame, x_title: str, y_title: str
+        self,
+        name: str,
+        df: pd.DataFrame,
+        x_title: str,
+        y_title: str,
+        x_range: Tuple[float, float] = None,
+        y_range: Tuple[float, float] = None,
     ) -> ViewData:
-        chart = self._add_chart(df, x_title=x_title, y_title=y_title)
+        chart = self._add_chart(
+            df, x_title=x_title, y_title=y_title, x_range=x_range, y_range=y_range
+        )
         chart.chart().setTitle(name)
         tree_item = QTreeWidgetItem()
         tree_item.setText(0, name)
@@ -300,6 +308,8 @@ class MainWindow(QMainWindow):
                 new_df,
                 action.view.x_title,
                 action.view.y_title,
+                action.view.x_range,
+                action.view.y_range,
             )
         elif hasattr(action, "filter"):
             new_df = action.filter.filter(input_df)

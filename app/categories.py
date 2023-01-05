@@ -64,9 +64,17 @@ class DataFilter:
 
 
 class DataView:
+    # Name displayed in the drop down menu
     name = "Base Data View"
+    # Titles for the x and y axes displayed on the chart
     x_title = ""
     y_title = ""
+    # Default range to initially display. Set to None for auto ranging
+    x_range = (0, 1000)
+    y_range = None
+    # Dict of options to be used by the generate function.
+    # TODO: Display dialog to set options if available
+    options = None
 
     def generate(self, df: pd.DataFrame) -> pd.DataFrame:
         return df
