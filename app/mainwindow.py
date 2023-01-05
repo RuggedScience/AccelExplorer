@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, QCursor
 from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
-from PySide6.QtCharts import QValueAxis, QLineSeries
+from PySide6.QtCharts import QValueAxis, QLineSeries, QChart
 
 from .utils import get_plugin_manager
 from .categories import DataFilter, DataView
@@ -82,6 +82,59 @@ class MainWindow(QMainWindow):
             self._mdi_area.tileSubWindows()
         return sub_window
 
+    def _generate_series_data(self, series: pd.Series) -> List[QPointF]:
+        points = []
+        for index, value in series.items():
+            if isinstance(index, pd.Timedelta):
+                x = float(index.total_seconds())
+            else:
+                x = float(index)
+
+            y = float(value)
+            points.append(QPointF(x, y))
+        return points
+
+    def _replace_chart_data(self, df: pd.DataFrame, chart: QChart) -> List[QLineSeries]:
+        x_axis = chart.axisX()
+        y_axis = chart.axisY()
+
+        new_series = []
+
+        for col, data in df.items():
+            found = False
+            for series in chart.series():
+                if series.name() == col:
+                    found = True
+                    break
+
+            if not found:
+                series = QLineSeries()
+                series.setName(col)
+                chart.addSeries(series)
+                series.attachAxis(x_axis)
+                series.attachAxis(y_axis)
+                new_series.append(series)
+
+            points = self._generate_series_data(data)
+            series.replace(points)
+
+            # Only use OpenGL with large datasets
+            use_opengl = len(points) > 100000
+            # Bug when disabling opengl causes the "old"
+            # series data to still be drawn on top of
+            # the new series data. Hide and show fixes this.
+            if not use_opengl and series.useOpenGL():
+                series.hide()
+                QTimer.singleShot(10, series.show)
+
+            series.setUseOpenGL(use_opengl)
+
+            pen = series.pen()
+            pen.setWidth(4)
+            series.setPen(pen)
+
+        return new_series
+
     def _add_chart(
         self,
         df: pd.DataFrame,
@@ -135,33 +188,9 @@ class MainWindow(QMainWindow):
         chart.addAxis(x_axis, Qt.AlignBottom)
         chart.addAxis(y_axis, Qt.AlignLeft)
 
-        for col, data in df.items():
-            points = []
-            for index, value in data.items():
-                if isinstance(index, pd.Timedelta):
-                    x = float(index.total_seconds())
-                else:
-                    x = float(index)
+        new_series = self._replace_chart_data(df, chart)
 
-                y = float(value)
-                points.append(QPointF(x, y))
-
-            series = QLineSeries()
-            series.setName(col)
-
-            # Only use OpenGL with large datasets
-            if len(points) > 100000:
-                series.setUseOpenGL(True)
-
-            chart.addSeries(series)
-            series.attachAxis(x_axis)
-            series.attachAxis(y_axis)
-            series.replace(points)
-
-            pen = series.pen()
-            pen.setWidth(4)
-            series.setPen(pen)
-
+        for series in new_series:
             series.hovered.connect(point_hovered)
             series.clicked.connect(chart_view.keep_tooltip)
 
@@ -268,6 +297,8 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
 
+        crop_action = QAction("Crop")
+        menu.addAction(crop_action)
         export_action = QAction("Export")
         menu.addAction(export_action)
 
@@ -285,7 +316,23 @@ class MainWindow(QMainWindow):
         if df is None:
             return
 
-        if action is export_action:
+        if action is crop_action:
+            data = self._get_view_from_tree_item(item)
+            chart = data.widget.chart()
+            x_axis = chart.axisX()
+            y_axis = chart.axisY()
+
+            x_min = x_axis.min()
+            x_max = x_axis.max()
+            if df.index.inferred_type == "timedelta64":
+                x_min = pd.to_timedelta(x_min, unit="S")
+                x_max = pd.to_timedelta(x_max, unit="S")
+
+            new_df = df[(df.index >= x_min) & (df.index <= x_max)]
+            self._replace_chart_data(new_df, chart)
+
+            pass
+        elif action is export_action:
             fileName, filter = QFileDialog.getSaveFileName(
                 self, "Export File", None, "HDFS (*.h5);;CSV (*.csv)"
             )
