@@ -184,9 +184,6 @@ class MainWindow(QMainWindow):
                 # Convert index from datetime to timedelta
                 series = df.index.to_series()
                 df.index = series - series[0]
-
-            elif file.suffix().lower() == "h5":
-                df = pd.read_hdf(file.absoluteFilePath())
             else:
                 dlg = ParserDialog(file.absoluteFilePath(), self)
                 if not dlg.exec():
@@ -202,7 +199,7 @@ class MainWindow(QMainWindow):
             for url in mimeData.urls():
                 if url.isLocalFile():
                     info = QFileInfo(url.toLocalFile())
-                    if info.suffix().lower() in ("csv", "ide", "h5"):
+                    if info.suffix().lower() in ("csv", "ide"):
                         files.append(info)
         return files
 
@@ -270,17 +267,11 @@ class MainWindow(QMainWindow):
         elif action is export_action:
             suggested_name = item.text(0).split(".")[0]
             fileName, filter = QFileDialog.getSaveFileName(
-                self, "Export File", suggested_name, "HDFS (*.h5);;CSV (*.csv)"
+                self, "Export File", suggested_name, "CSV (*.csv)"
             )
             if fileName:
                 if "csv" in filter:
                     df.to_csv(fileName)
-                else:
-                    # Clean up the key so it doesn't yell about natural naming...
-                    suggested_name = suggested_name.replace(" - ", "_")
-                    suggested_name = suggested_name.replace("-", "_")
-                    suggested_name = suggested_name.replace(" ", "_")
-                    df.to_hdf(fileName, key=suggested_name, mode="w")
         else:
             params = {}
             plugin = action.plugin.plugin_object
