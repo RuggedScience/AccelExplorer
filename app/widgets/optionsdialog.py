@@ -10,9 +10,10 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
     QDialogButtonBox,
+    QComboBox,
 )
 
-from ..plugins.options import DataOption, NumericOption
+from ..plugins.options import DataOption, NumericOption, ListOption
 
 
 class OptionsDialog(QDialog):
@@ -31,6 +32,9 @@ class OptionsDialog(QDialog):
             label = QLabel(v.name, self)
             if isinstance(v, NumericOption):
                 widget = self._get_spin_box(v.value, v.min, v.max)
+            elif isinstance(v, ListOption):
+                widget = QComboBox(self)
+                widget.addItems([i.name for i in v.options])
 
             form_layout.addRow(label, widget)
             self._widgets[k] = widget
@@ -64,11 +68,17 @@ class OptionsDialog(QDialog):
     def values(self) -> Dict[str, Any]:
         values = {}
         for k, widget in self._widgets.items():
+            value = None
             if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                 value = widget.value()
-            else:
-                continue
+            elif isinstance(widget, QComboBox):
+                text = widget.currentText()
+                options = self._options[k].options
+                for option in options:
+                    if option.name == text:
+                        value = option.value
 
-            values[k] = value
+            if value is not None:
+                values[k] = value
 
         return values
