@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 from abc import ABC, abstractmethod
 
 from .options import DataOption
@@ -11,5 +11,9 @@ class DataPlugin(ABC):
         pass
 
     @property
-    def options(self) -> "Dict[str, DataOption]":
+    def options(self) -> Dict[str, DataOption]:
         return {}
+
+    @property
+    def index_types(self) -> List[str]:
+        return None

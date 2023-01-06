@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 import pandas as pd
 import endaq
@@ -22,6 +22,12 @@ class SRSView(dataview.DataView):
             "max_freq": NumericOption("Max Frequency", 1000, 1, None),
             "dampening": NumericOption("Dampening", 5, 0, 100),
         }
+
+    @property
+    def index_types(self) -> List[str]:
+        return [
+            "timedelta64",
+        ]
 
     def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         min_x = kwargs.get("min_freq", 10)
