@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
 )
 
-from .plugins import DataOption, NumericOption
+from .plugins.options import DataOption, NumericOption
 
 
 class OptionsDialog(QDialog):

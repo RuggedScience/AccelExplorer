@@ -4,10 +4,11 @@ import pandas as pd
 import endaq as ed
 
 
-from app.plugins import DataView, DataOption, NumericOption
+from app.plugins import dataview
+from app.plugins.options import DataOption, NumericOption
 
 
-class FFTView(DataView):
+class FFTView(dataview.DataView):
     name = "FFT"
     x_title = "Frequency"
     y_title = "Magnitude"

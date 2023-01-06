@@ -4,10 +4,10 @@ import linecache
 
 import pandas as pd
 
-from app.plugins import CSVParser, ParseError
+from app.plugins import parsers
 
 
-class NULabsCSVParser(CSVParser):
+class NULabsCSVParser(parsers.CSVParser):
     name = "NU Labs"
     header_row = 16
     sample_rate = 0
@@ -21,7 +21,7 @@ class NULabsCSVParser(CSVParser):
             except:
                 pass
 
-        raise ParseError("Could not find sample rate")
+        raise parsers.ParseError("Could not find sample rate")
 
     def can_parse(self, filename: str) -> bool:
         try:

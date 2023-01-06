@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Dict
     import pandas as pd
-    from .option import DataOption
+    from .options import DataOption
 
 
 class DataView:
