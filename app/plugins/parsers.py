@@ -1,6 +1,3 @@
-from typing import Dict, List
-from collections import namedtuple
-
 import pandas as pd
 
 
@@ -52,31 +49,3 @@ class CSVParser:
 
         df = pd.read_csv(filename, header=self.header_row - 1)
         return self._process_df(df)
-
-
-DataOption = namedtuple("DataOption", ["name", "value", "min", "max"])
-
-
-class DataFilter:
-    name = "Base Data Filter"
-
-    def get_options(self, df: pd.DataFrame) -> Dict[str, float]:
-        return {}
-
-    def filter(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
-        return df
-
-
-class DataView:
-    # Name displayed in the drop down menu
-    name = "Base Data View"
-    # Titles for the x and y axes displayed on the chart
-    x_title = ""
-    y_title = ""
-
-    def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
-        return df
-
-    @property
-    def options(self) -> Dict[str, DataOption]:
-        return {}

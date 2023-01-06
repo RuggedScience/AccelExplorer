@@ -4,7 +4,7 @@ import linecache
 
 import pandas as pd
 
-from app.categories import CSVParser, ParseError
+from app.plugins import CSVParser, ParseError
 
 
 class NULabsCSVParser(CSVParser):

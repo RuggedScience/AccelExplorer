@@ -4,7 +4,7 @@ import pandas as pd
 import endaq as ed
 
 
-from app.categories import DataView, DataOption
+from app.plugins import DataView, DataOption, NumericOption
 
 
 class FFTView(DataView):
@@ -22,6 +22,6 @@ class FFTView(DataView):
     @property
     def options(self) -> Dict[str, DataOption]:
         return {
-            "min_freq": DataOption("Min Frequency", 10, 1, None),
-            "max_freq": DataOption("Max Frequency", 1000, 1, None),
+            "min_freq": NumericOption("Min Frequency", 10, 1, None),
+            "max_freq": NumericOption("Max Frequency", 1000, 1, None),
         }

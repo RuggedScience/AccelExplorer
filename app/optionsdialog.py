@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QFormLayout,
     QLabel,
     QSpinBox,
@@ -13,7 +12,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
 )
 
-from .categories import DataOption
+from .plugins import DataOption, NumericOption
 
 
 class OptionsDialog(QDialog):
@@ -30,7 +29,8 @@ class OptionsDialog(QDialog):
                 continue
 
             label = QLabel(v.name, self)
-            widget = self._get_spin_box(v.value, v.min, v.max)
+            if isinstance(v, NumericOption):
+                widget = self._get_spin_box(v.value, v.min, v.max)
 
             form_layout.addRow(label, widget)
             self._widgets[k] = widget

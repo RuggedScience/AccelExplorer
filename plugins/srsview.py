@@ -3,7 +3,7 @@ from typing import Dict
 import pandas as pd
 import endaq
 
-from app.categories import DataView, DataOption
+from app.plugins import DataView, DataOption, NumericOption
 
 
 class SRSView(DataView):
@@ -24,7 +24,7 @@ class SRSView(DataView):
     @property
     def options(self) -> Dict[str, DataOption]:
         return {
-            "min_freq": DataOption("Min Frequency", 10, 1, None),
-            "max_freq": DataOption("Max Frequency", 1000, 1, None),
-            "dampening": DataOption("Dampening", 5, 0, 100),
+            "min_freq": NumericOption("Min Frequency", 10, 1, None),
+            "max_freq": NumericOption("Max Frequency", 1000, 1, None),
+            "dampening": NumericOption("Dampening", 5, 0, 100),
         }

@@ -8,7 +8,7 @@ import pandas as pd
 
 from .utils import get_plugin_manager
 from .ui.ui_parserdialog import Ui_Dialog
-from .categories import CSVParser, ParseError
+from .plugins import CSVParser, ParseError
 
 
 class ParserDialog(QDialog):

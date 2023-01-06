@@ -18,7 +18,7 @@ from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObje
 from PySide6.QtCharts import QValueAxis, QLineSeries, QChart
 
 from .utils import get_plugin_manager, timing
-from .categories import DataFilter, DataView
+from .plugins import DataView, DataFilter
 from .ui import resources_rc
 from .ui.ui_mainwindow import Ui_MainWindow
 from .zoomchart import ZoomChart
