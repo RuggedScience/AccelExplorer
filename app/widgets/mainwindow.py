@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, List, NamedTuple
+from typing import Tuple, List
 from collections.abc import Iterable
 
 import pandas as pd
@@ -15,28 +15,32 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QMenu,
     QFileDialog,
+    QUndoView,
 )
-from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, QCursor
-from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
-from PySide6.QtCharts import QValueAxis, QLineSeries, QChart
+from PySide6.QtGui import (
+    QDragEnterEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QAction,
+    QCursor,
+    QUndoStack,
+    QKeySequence,
+)
+from PySide6.QtCore import QEvent, QFileInfo, Qt, QPoint, QTimer, QObject
+from PySide6.QtCharts import QValueAxis
 
 from app.utils import get_plugin_path, timing
 from app.plugins.dataview import DataView
 from app.plugins.datafilter import DataFilter
 from app.ui import resources_rc
 from app.ui.ui_mainwindow import Ui_MainWindow
+from app.viewcontroller import ViewController
+from app.commands.modifydatacommand import ModifyDataCommand
 
 from .zoomchart import ZoomChart
 from .parserdialog import ParserDialog
 from .snapmdiarea import SnapMdiArea
 from .optionsdialog import OptionsDialog
-
-
-class ViewData(NamedTuple):
-    tree_item: QTreeWidgetItem
-    widget: ZoomChart
-    df: pd.DataFrame
-    window: QMdiSubWindow
 
 
 class MainWindow(QMainWindow):
@@ -83,7 +87,19 @@ class MainWindow(QMainWindow):
             action.view = plugin.plugin_object
             self._view_menu.addAction(action)
 
-        self._open_views: List[ViewData] = []
+        self._open_views: List[ViewController] = []
+
+        self._undo_stack = QUndoStack(self)
+
+        undoAction = self._undo_stack.createUndoAction(self, "Undo")
+        undoAction.setShortcuts(QKeySequence.Undo)
+
+        redoAction = self._undo_stack.createRedoAction(self, "Redo")
+        redoAction.setShortcuts(QKeySequence.Redo)
+
+        self.addActions([undoAction, redoAction])
+
+        self.ui.undoView.setStack(self._undo_stack)
 
     def _add_subwindow(self, widget: QWidget) -> QMdiSubWindow:
         sub_window = self._mdi_area.addSubWindow(widget)
@@ -94,126 +110,40 @@ class MainWindow(QMainWindow):
             self._mdi_area.tileSubWindows()
         return sub_window
 
-    def _replace_chart_data(self, df: pd.DataFrame, chart: QChart) -> List[QLineSeries]:
-        x_axis = chart.axisX()
-        y_axis = chart.axisY()
-
-        new_series = []
-
-        for col, data in df.items():
-            found = False
-            for series in chart.series():
-                if series.name() == col:
-                    found = True
-                    break
-
-            if not found:
-                series = QLineSeries()
-                series.setName(col)
-                chart.addSeries(series)
-                series.attachAxis(x_axis)
-                series.attachAxis(y_axis)
-                new_series.append(series)
-
-            points = _generate_series_data(data)
-            series.replace(points)
-
-            # Only use OpenGL with large datasets
-            use_opengl = len(points) > 100000
-            # Bug when disabling opengl causes the "old"
-            # series data to still be drawn on top of
-            # the new series data. Hide and show fixes this.
-            if not use_opengl and series.useOpenGL():
-                series.hide()
-                QTimer.singleShot(10, series.show)
-
-            series.setUseOpenGL(use_opengl)
-
-            pen = series.pen()
-            pen.setWidth(4)
-            series.setPen(pen)
-
-        return new_series
-
-    def _add_chart(
-        self,
-        df: pd.DataFrame,
-        callouts: pd.DataFrame = None,
-        x_range: Tuple[float, float] = None,
-        y_range: Tuple[float, float] = None,
-        x_title: str = None,
-        y_title: str = None,
-    ) -> ZoomChart:
-        chart_view = ZoomChart(self)
-        chart = chart_view.chart()
-        # chart.legend().hide()
-
-        def point_hovered(pos: QPointF, state: bool):
-            if state:
-                chart_view.show_tooltip(
-                    pos, f"{x_title}: {pos.x():.2f}\n{y_title}: {pos.y():.2f}"
-                )
-            else:
-                chart_view.tooltip.hide()
-
-        x = df.index
-        x_axis = QValueAxis()
-
-        if x_title:
-            x_axis.setTitleText(x_title)
-        else:
-            x_axis.setTitleText(x.name)
-
-        if x_range:
-            x_axis.setRange(*x_range)
-        else:
-            if isinstance(x, pd.TimedeltaIndex):
-                x_axis.setRange(x.min().total_seconds(), x.max().total_seconds())
-            else:
-                x_axis.setRange(x[0], x[-1])
-
-        y_axis = QValueAxis()
-
-        if y_title:
-            y_axis.setTitleText(y_title)
-
-        if y_range:
-            y_axis.setRange(*y_range)
-        else:
-            # Add some margin to the y axis
-            y_min = df.min(axis=1).min()
-            y_max = df.max(axis=1).max()
-            y_axis.setRange(y_min - abs(y_min * 0.1), y_max + abs(y_max * 0.1))
-
-        chart.addAxis(x_axis, Qt.AlignBottom)
-        chart.addAxis(y_axis, Qt.AlignLeft)
-
-        new_series = self._replace_chart_data(df, chart)
-
-        for series in new_series:
-            series.hovered.connect(point_hovered)
-            series.clicked.connect(chart_view.keep_tooltip)
-
-        if not callouts is None:
-            for _, row in callouts.iterrows():
-                pos = QPointF(row["freq"], row["mag"])
-                chart_view.add_callout(
-                    pos, f"Frequency: {pos.x():.2f}\nMagnitude: {pos.y():.2f}"
-                )
-
-        return chart_view
-
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if isinstance(watched, QMdiSubWindow) and event.type() == QEvent.Close:
             for view in self._open_views:
-                if view.window == watched:
+                if view.chart_view is watched.widget():
                     self._remove_view(view)
 
         return super().eventFilter(watched, event)
 
-    def _remove_view(self, view: ViewData):
+    def _remove_view(self, view: ViewController):
         self.ui.treeWidget.invisibleRootItem().removeChild(view.tree_item)
         self._open_views.remove(view)
+
+    def _create_chart(
+        self,
+        x_title: str,
+        y_title: str,
+        x_range: Tuple[float, float],
+        y_range: Tuple[float, float],
+    ):
+        chart_view = ZoomChart(self)
+        chart = chart_view.chart()
+
+        x_axis = QValueAxis()
+        x_axis.setTitleText(x_title)
+        x_axis.setRange(*x_range)
+
+        y_axis = QValueAxis()
+        y_axis.setTitleText(y_title)
+        y_axis.setRange(*y_range)
+
+        chart.addAxis(x_axis, Qt.AlignBottom)
+        chart.addAxis(y_axis, Qt.AlignLeft)
+
+        return chart_view
 
     def _add_view(
         self,
@@ -223,29 +153,40 @@ class MainWindow(QMainWindow):
         y_title: str,
         x_range: Tuple[float, float] = None,
         y_range: Tuple[float, float] = None,
-    ) -> ViewData:
-        chart = self._add_chart(
-            df, x_title=x_title, y_title=y_title, x_range=x_range, y_range=y_range
-        )
-        chart.chart().setTitle(name)
-        tree_item = QTreeWidgetItem()
-        tree_item.setText(0, name)
+    ) -> ViewController:
+
+        if x_range is None:
+            x = df.index
+            if isinstance(x, pd.TimedeltaIndex):
+                x_range = (x.min().total_seconds(), x.max().total_seconds())
+            else:
+                x_range = (x[0], x[-1])
+
+        if y_range is None:
+            # Add some margin to the y axis
+            y_min = df.min(axis=1).min()
+            y_max = df.max(axis=1).max()
+            y_range = (y_min - abs(y_min * 0.1), y_max + abs(y_max * 0.1))
+
+        chart_view = self._create_chart(x_title, y_title, x_range, y_range)
+        controller = ViewController(name, chart_view, df)
+
+        tree_item = controller.tree_item
         tree_item.setFlags(tree_item.flags() | Qt.ItemIsAutoTristate)
-        tree_item.setExpanded(True)
         self.ui.treeWidget.addTopLevelItem(tree_item)
-        sw = self._add_subwindow(chart)
+        tree_item.setExpanded(True)
+        sw = self._add_subwindow(chart_view)
         sw.setWindowTitle(name)
         sw.installEventFilter(self)
 
-        for series in chart.chart().series():
+        for series in controller.chart.series():
             series_item = QTreeWidgetItem(tree_item)
             series_item.setText(0, series.name())
             series_item.setCheckState(0, Qt.Checked)
             series_item.series = series
 
-        data = ViewData(tree_item=tree_item, widget=chart, df=df, window=sw)
-        self._open_views.append(data)
-        return data
+        self._open_views.append(controller)
+        return controller
 
     def _add_files(self, files: Iterable[QFileInfo]) -> None:
         for file in files:
@@ -316,12 +257,12 @@ class MainWindow(QMainWindow):
         if df is None:
             return
 
-        data = self._get_view_from_tree_item(item)
-        if data is None:
+        controller = self._get_view_from_tree_item(item)
+        if controller is None:
             return
 
         if action is crop_action:
-            chart = data.widget.chart()
+            chart = controller.chart
             x_axis = chart.axisX()
             y_axis = chart.axisY()
 
@@ -332,9 +273,7 @@ class MainWindow(QMainWindow):
                 x_max = pd.to_timedelta(x_max, unit="S")
 
             new_df = df[(df.index >= x_min) & (df.index <= x_max)]
-            self._replace_chart_data(new_df, chart)
-
-            pass
+            self._undo_stack.push(ModifyDataCommand("Crop - ", controller, df, new_df))
         elif action is export_action:
             suggested_name = item.text(0).split(".")[0]
             fileName, filter = QFileDialog.getSaveFileName(
@@ -353,7 +292,7 @@ class MainWindow(QMainWindow):
         elif hasattr(item, "series"):
             name = item.series.name()
             input_df = df[name].to_frame()
-            item_text = f"{data.tree_item.text(0)} ({item.text(0)} only)"
+            item_text = f"{controller.tree_item.text(0)} ({item.text(0)} only)"
         else:
             input_df = df
             item_text = item.text(0)
@@ -375,10 +314,17 @@ class MainWindow(QMainWindow):
                 action.view.y_title,
             )
         elif hasattr(action, "filter"):
-            new_df = action.filter.filter(input_df)
-            name = action.filter.name
-            self._add_view(
-                f"{name} - {item.text(0)}", new_df, new_df.index.name, "Test"
+            params = {}
+            options = action.filter.options
+            if options:
+                dlg = OptionsDialog(options, self)
+                if dlg.exec():
+                    params = dlg.values
+            new_df = action.filter.filter(input_df, **params)
+            self._undo_stack.push(
+                ModifyDataCommand(
+                    f"{action.filter.name} filter - ", controller, df, new_df
+                )
             )
 
     def _current_tree_item_changed(self, current: QTreeWidgetItem, _) -> None:
@@ -397,7 +343,7 @@ class MainWindow(QMainWindow):
             item = item.parent()
         return item
 
-    def _get_view_from_tree_item(self, item: QTreeWidgetItem) -> ViewData:
+    def _get_view_from_tree_item(self, item: QTreeWidgetItem) -> ViewController:
         item = self._get_root_parent(item)
         if item:
             for view in self._open_views:
@@ -416,10 +362,3 @@ class MainWindow(QMainWindow):
                     return view.df[col].to_frame()
 
         return None
-
-
-def _generate_series_data(series: pd.Series) -> List[QPointF]:
-    if series.index.inferred_type == "timedelta64":
-        series.index = series.index.total_seconds()
-
-    return [QPointF(float(i), float(v)) for i, v in series.items()]
