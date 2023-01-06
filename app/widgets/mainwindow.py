@@ -24,8 +24,9 @@ from PySide6.QtGui import (
     QCursor,
     QUndoStack,
     QKeySequence,
+    QCloseEvent,
 )
-from PySide6.QtCore import QEvent, QFileInfo, Qt, QPoint, QTimer, QObject
+from PySide6.QtCore import QEvent, QFileInfo, Qt, QPoint, QTimer, QObject, QSettings
 from PySide6.QtCharts import QValueAxis
 
 from app.utils import get_plugin_path, timing
@@ -99,14 +100,21 @@ class MainWindow(QMainWindow):
 
         self.ui.undoView.setStack(self._undo_stack)
 
-    def _add_subwindow(self, widget: QWidget) -> QMdiSubWindow:
-        sub_window = self._mdi_area.addSubWindow(widget)
-        widget.show()
-        if len(self._mdi_area.subWindowList()) == 1:
-            sub_window.showMaximized()
-        else:
-            self._mdi_area.tileSubWindows()
-        return sub_window
+        self._load_settings()
+
+    def _load_settings(self):
+        settings = QSettings()
+        self.restoreGeometry(settings.value("geometry"))
+        self.restoreState(settings.value("state"))
+
+    def _save_settings(self):
+        settings = QSettings()
+        settings.setValue("geometry", self.saveGeometry())
+        settings.setValue("state", self.saveState())
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_settings()
+        return super().closeEvent(event)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if isinstance(watched, QMdiSubWindow) and event.type() == QEvent.Close:
@@ -115,6 +123,15 @@ class MainWindow(QMainWindow):
                     self._remove_view(view)
 
         return super().eventFilter(watched, event)
+
+    def _add_subwindow(self, widget: QWidget) -> QMdiSubWindow:
+        sub_window = self._mdi_area.addSubWindow(widget)
+        widget.show()
+        if len(self._mdi_area.subWindowList()) == 1:
+            sub_window.showMaximized()
+        else:
+            self._mdi_area.tileSubWindows()
+        return sub_window
 
     def _remove_view(self, view: ViewController):
         self.ui.treeWidget.invisibleRootItem().removeChild(view.tree_item)
