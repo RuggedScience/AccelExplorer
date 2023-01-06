@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, List
+from typing import List
 from collections.abc import Iterable
 
 import pandas as pd
@@ -38,10 +38,10 @@ from app.ui.ui_mainwindow import Ui_MainWindow
 from app.viewcontroller import ViewController
 from app.commands import ModifyDataCommand, CropCommand
 
-from .zoomchart import ZoomChart
-from .parserdialog import ParserDialog
-from .snapmdiarea import SnapMdiArea
-from .optionsdialog import OptionsDialog
+from app.widgets.parserdialog import ParserDialog
+from app.widgets.snapmdiarea import SnapMdiArea
+from app.widgets.optionsdialog import OptionsDialog
+from app.widgets.zoomchart import ZoomChart
 
 
 class MainWindow(QMainWindow):

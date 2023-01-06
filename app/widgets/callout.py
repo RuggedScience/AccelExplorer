@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsSceneMouseEvent
-from PySide6.QtCore import QPointF, QRectF, QRect, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, QRect, Qt
 from PySide6.QtGui import QFont, QPainterPath, QColor, QFontMetrics
 
 if TYPE_CHECKING:
@@ -145,8 +145,8 @@ class Callout(QGraphicsItem):
 
             self.setPos(pos)
         event.setAccepted(True)
-        #else:
-            #event.setAccepted(False)
+        # else:
+        # event.setAccepted(False)
 
     def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         self.hide()

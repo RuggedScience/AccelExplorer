@@ -7,9 +7,19 @@ from PySide6.QtGui import (
     QTextFormat,
     QTextCursor,
 )
-from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtCore import QRect, Qt, Signal, QSize
 
-from .linenumberarea import LineNumberArea
+
+class LineNumberArea(QWidget):
+    def __init__(self, viewer: "CSVViewer") -> None:
+        super().__init__(viewer)
+        self._viewer = viewer
+
+    def sizeHint(self) -> QSize:
+        return QSize(self._viewer.lineNumberAreaWidth(), 0)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        self._viewer.lineNumberAreaPaintEvent(event)
 
 
 class CSVViewer(QPlainTextEdit):
