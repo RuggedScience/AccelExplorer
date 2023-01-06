@@ -15,6 +15,7 @@ class ViewController(QObject):
         self._chart_view = chart_view
         self.name = name
         self.df = df
+        self.fit_contents()
 
     @property
     def name(self) -> str:
@@ -45,6 +46,21 @@ class ViewController(QObject):
     @df.setter
     def df(self, df: pd.DataFrame) -> None:
         self._replace_data(df)
+
+    def fit_contents(self) -> None:
+        x = self._df.index
+        if isinstance(x, pd.TimedeltaIndex):
+            x_range = (x.min().total_seconds(), x.max().total_seconds())
+        else:
+            x_range = (x[0], x[-1])
+
+        # Add some margin to the y axis
+        y_min = self._df.min(axis=1).min()
+        y_max = self._df.max(axis=1).max()
+        y_range = (y_min - abs(y_min * 0.1), y_max + abs(y_max * 0.1))
+
+        self.chart.axisX().setRange(*x_range)
+        self.chart.axisY().setRange(*y_range)
 
     def _point_hovered(self, pos: QPointF, state: bool):
         if state:

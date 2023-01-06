@@ -1,8 +1,8 @@
 import pandas as pd
 
-from .dataplugin import DataPlugin
+from . import dataplugin
 
 
-class DataFilter(DataPlugin):
+class DataFilter(dataplugin.DataPlugin):
     def filter(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         return df

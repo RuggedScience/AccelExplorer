@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QMenu,
     QFileDialog,
-    QUndoView,
 )
 from PySide6.QtGui import (
     QDragEnterEvent,
@@ -30,12 +29,13 @@ from PySide6.QtCore import QEvent, QFileInfo, Qt, QPoint, QTimer, QObject
 from PySide6.QtCharts import QValueAxis
 
 from app.utils import get_plugin_path, timing
+from app.plugins.dataplugin import DataPlugin
 from app.plugins.dataview import DataView
 from app.plugins.datafilter import DataFilter
 from app.ui import resources_rc
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.viewcontroller import ViewController
-from app.commands.modifydatacommand import ModifyDataCommand
+from app.commands import ModifyDataCommand, CropCommand
 
 from .zoomchart import ZoomChart
 from .parserdialog import ParserDialog
@@ -70,22 +70,20 @@ class MainWindow(QMainWindow):
                 os.path.join(plugin_dir, "views"),
             ]
         )
-        pm.setCategoriesFilter({"Filters": DataFilter, "Views": DataView})
+        pm.setCategoriesFilter({"data": DataPlugin})
         pm.collectPlugins()
 
         self._filter_menu = QMenu("Filters")
-        for plugin in pm.getPluginsOfCategory("Filters"):
-            action = QAction(plugin.name, self)
-            action.setWhatsThis(plugin.description)
-            action.filter = plugin.plugin_object
-            self._filter_menu.addAction(action)
-
         self._view_menu = QMenu("Views")
-        for plugin in pm.getPluginsOfCategory("Views"):
+
+        for plugin in pm.getPluginsOfCategory("data"):
             action = QAction(plugin.name, self)
             action.setWhatsThis(plugin.description)
-            action.view = plugin.plugin_object
-            self._view_menu.addAction(action)
+            action.plugin = plugin
+            if isinstance(plugin.plugin_object, DataFilter):
+                self._filter_menu.addAction(action)
+            elif isinstance(plugin.plugin_object, DataView):
+                self._view_menu.addAction(action)
 
         self._open_views: List[ViewController] = []
 
@@ -122,53 +120,25 @@ class MainWindow(QMainWindow):
         self.ui.treeWidget.invisibleRootItem().removeChild(view.tree_item)
         self._open_views.remove(view)
 
-    def _create_chart(
-        self,
-        x_title: str,
-        y_title: str,
-        x_range: Tuple[float, float],
-        y_range: Tuple[float, float],
-    ):
-        chart_view = ZoomChart(self)
-        chart = chart_view.chart()
-
-        x_axis = QValueAxis()
-        x_axis.setTitleText(x_title)
-        x_axis.setRange(*x_range)
-
-        y_axis = QValueAxis()
-        y_axis.setTitleText(y_title)
-        y_axis.setRange(*y_range)
-
-        chart.addAxis(x_axis, Qt.AlignBottom)
-        chart.addAxis(y_axis, Qt.AlignLeft)
-
-        return chart_view
-
     def _add_view(
         self,
         name: str,
         df: pd.DataFrame,
         x_title: str,
         y_title: str,
-        x_range: Tuple[float, float] = None,
-        y_range: Tuple[float, float] = None,
     ) -> ViewController:
+        chart_view = ZoomChart(self)
+        chart = chart_view.chart()
 
-        if x_range is None:
-            x = df.index
-            if isinstance(x, pd.TimedeltaIndex):
-                x_range = (x.min().total_seconds(), x.max().total_seconds())
-            else:
-                x_range = (x[0], x[-1])
+        x_axis = QValueAxis()
+        x_axis.setTitleText(x_title)
 
-        if y_range is None:
-            # Add some margin to the y axis
-            y_min = df.min(axis=1).min()
-            y_max = df.max(axis=1).max()
-            y_range = (y_min - abs(y_min * 0.1), y_max + abs(y_max * 0.1))
+        y_axis = QValueAxis()
+        y_axis.setTitleText(y_title)
 
-        chart_view = self._create_chart(x_title, y_title, x_range, y_range)
+        chart.addAxis(x_axis, Qt.AlignBottom)
+        chart.addAxis(y_axis, Qt.AlignLeft)
+
         controller = ViewController(name, chart_view, df)
 
         tree_item = controller.tree_item
@@ -235,6 +205,13 @@ class MainWindow(QMainWindow):
 
     def _context_menu_requested(self, pos: QPoint) -> None:
         item = self.ui.treeWidget.itemAt(pos)
+        df = self._get_df_from_tree_item(item)
+        if df is None:
+            return
+
+        controller = self._get_view_from_tree_item(item)
+        if controller is None:
+            return
 
         menu = QMenu(self)
 
@@ -242,6 +219,14 @@ class MainWindow(QMainWindow):
         menu.addAction(crop_action)
         export_action = QAction("Export")
         menu.addAction(export_action)
+
+        actions = self._filter_menu.actions() + self._view_menu.actions()
+        # Plugins can specify supported index types.
+        # Disable plugins that don't support the current index type.
+        for action in actions:
+            plugin = action.plugin.plugin_object
+            if plugin.index_types:
+                action.setEnabled(df.index.inferred_type in plugin.index_types)
 
         if self._filter_menu.actions():
             menu.addMenu(self._filter_menu)
@@ -253,18 +238,9 @@ class MainWindow(QMainWindow):
         if not action:
             return
 
-        df = self._get_df_from_tree_item(item)
-        if df is None:
-            return
-
-        controller = self._get_view_from_tree_item(item)
-        if controller is None:
-            return
-
         if action is crop_action:
             chart = controller.chart
             x_axis = chart.axisX()
-            y_axis = chart.axisY()
 
             x_min = x_axis.min()
             x_max = x_axis.max()
@@ -273,7 +249,7 @@ class MainWindow(QMainWindow):
                 x_max = pd.to_timedelta(x_max, unit="S")
 
             new_df = df[(df.index >= x_min) & (df.index <= x_max)]
-            self._undo_stack.push(ModifyDataCommand("Crop - ", controller, df, new_df))
+            self._undo_stack.push(CropCommand(controller, df, new_df))
         elif action is export_action:
             suggested_name = item.text(0).split(".")[0]
             fileName, filter = QFileDialog.getSaveFileName(
@@ -288,44 +264,29 @@ class MainWindow(QMainWindow):
                     suggested_name = suggested_name.replace("-", "_")
                     suggested_name = suggested_name.replace(" ", "_")
                     df.to_hdf(fileName, key=suggested_name, mode="w")
-            pass
-        elif hasattr(item, "series"):
-            name = item.series.name()
-            input_df = df[name].to_frame()
-            item_text = f"{controller.tree_item.text(0)} ({item.text(0)} only)"
         else:
-            input_df = df
-            item_text = item.text(0)
-
-        if hasattr(action, "view"):
             params = {}
-            options = action.view.options
+            plugin = action.plugin.plugin_object
+            options = plugin.options
             if options:
                 dlg = OptionsDialog(options, self)
-                if dlg.exec():
-                    params = dlg.values
+                if dlg.exec() == OptionsDialog.Rejected:
+                    return
+                params = dlg.values
 
-            new_df = action.view.generate(input_df, **params)
-            name = action.view.name
-            self._add_view(
-                f"{name} - {item_text}",
-                new_df,
-                action.view.x_title,
-                action.view.y_title,
-            )
-        elif hasattr(action, "filter"):
-            params = {}
-            options = action.filter.options
-            if options:
-                dlg = OptionsDialog(options, self)
-                if dlg.exec():
-                    params = dlg.values
-            new_df = action.filter.filter(input_df, **params)
-            self._undo_stack.push(
-                ModifyDataCommand(
-                    f"{action.filter.name} filter - ", controller, df, new_df
+            if isinstance(plugin, DataFilter):
+                new_df = plugin.filter(df, **params)
+                command = ModifyDataCommand(action.plugin.name, controller, df, new_df)
+                self._undo_stack.push(command)
+            elif isinstance(plugin, DataView):
+                new_df = plugin.generate(df, **params)
+                name = action.plugin.name
+                self._add_view(
+                    f"{name} - {item.text(0)}",
+                    new_df,
+                    plugin.x_title,
+                    plugin.y_title,
                 )
-            )
 
     def _current_tree_item_changed(self, current: QTreeWidgetItem, _) -> None:
         data = self._get_view_from_tree_item(current)

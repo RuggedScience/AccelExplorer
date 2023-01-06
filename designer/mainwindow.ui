@@ -62,7 +62,11 @@
    <widget class="QWidget" name="dockWidgetContents_2">
     <layout class="QVBoxLayout" name="verticalLayout_3">
      <item>
-      <widget class="QUndoView" name="undoView"/>
+      <widget class="QUndoView" name="undoView">
+       <property name="emptyLabel">
+        <string>Original</string>
+       </property>
+      </widget>
      </item>
     </layout>
    </widget>

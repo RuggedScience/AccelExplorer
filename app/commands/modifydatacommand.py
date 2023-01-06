@@ -21,7 +21,7 @@ class ModifyDataCommand(QUndoCommand):
         self._old_df = old_df
         self._new_df = new_df
 
-        self.setText(f"{self._title} {self._controller.name}")
+        self.setText(f"{self._title} - {self._controller.name}")
 
     def undo(self) -> None:
         self._controller.df = self._old_df
