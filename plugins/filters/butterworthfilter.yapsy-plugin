@@ -1,0 +1,9 @@
+[Core]
+Name = Butterworth Filter
+Module = butterworthfilter
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Butterworth Filter for low, high, and band pass filtering
+Website = N/A
