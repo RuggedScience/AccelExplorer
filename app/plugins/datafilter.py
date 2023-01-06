@@ -1,10 +1,8 @@
-from typing import Dict
-
 import pandas as pd
 
+from .dataplugin import DataPlugin
 
-class DataFilter:
-    name = "Base Data Filter"
 
+class DataFilter(DataPlugin):
     def filter(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         return df

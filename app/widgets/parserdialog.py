@@ -1,14 +1,17 @@
+import os
 from typing import List
+
+import pandas as pd
+
+from yapsy.PluginManager import PluginManager
 
 from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox
 from PySide6.QtCore import QFileInfo, Qt
 from PySide6.QtGui import QBrush
 
-import pandas as pd
-
-from ..utils import get_plugin_manager
-from ..ui.ui_parserdialog import Ui_Dialog
-from ..plugins.parsers import CSVParser, ParseError
+from app.utils import get_plugin_path
+from app.ui.ui_parserdialog import Ui_Dialog
+from app.plugins.parsers import CSVParser, ParseError
 
 
 class ParserDialog(QDialog):
@@ -19,7 +22,8 @@ class ParserDialog(QDialog):
 
         self.ui.buttonBox.button(QDialogButtonBox.Ok).setText("Parse")
 
-        pm = get_plugin_manager()
+        pm = PluginManager()
+        pm.setPluginPlaces([os.path.join(get_plugin_path(), "parsers")])
         pm.setCategoriesFilter({"Parsers": CSVParser})
         pm.collectPlugins()
 

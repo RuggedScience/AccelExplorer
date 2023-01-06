@@ -1,8 +1,11 @@
+import os
 from typing import Tuple, List, NamedTuple
 from collections.abc import Iterable
 
 import pandas as pd
 import endaq as ed
+
+from yapsy.PluginManager import PluginManager
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -17,7 +20,7 @@ from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, 
 from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
 from PySide6.QtCharts import QValueAxis, QLineSeries, QChart
 
-from app.utils import get_plugin_manager, timing
+from app.utils import get_plugin_path, timing
 from app.plugins.dataview import DataView
 from app.plugins.datafilter import DataFilter
 from app.ui import resources_rc
@@ -55,7 +58,14 @@ class MainWindow(QMainWindow):
         self.ui.treeWidget.currentItemChanged.connect(self._current_tree_item_changed)
         self.ui.treeWidget.itemChanged.connect(self._tree_item_changed)
 
-        pm = get_plugin_manager()
+        plugin_dir = get_plugin_path()
+        pm = PluginManager()
+        pm.setPluginPlaces(
+            [
+                os.path.join(plugin_dir, "filters"),
+                os.path.join(plugin_dir, "views"),
+            ]
+        )
         pm.setCategoriesFilter({"Filters": DataFilter, "Views": DataView})
         pm.collectPlugins()
 

@@ -5,33 +5,23 @@ from functools import wraps
 from time import time
 
 
-from yapsy.PluginManager import PluginManager
-
-
-def we_are_frozen():
+def _we_are_frozen():
     """Returns whether we are frozen via py2exe.
     This will affect how we find out where we are located."""
 
     return hasattr(sys, "frozen")
 
 
-def module_path():
+def get_plugin_path():
     """This will get us the program's directory,
     even if we are frozen using py2exe"""
 
-    if we_are_frozen():
-        return os.path.dirname(sys.executable)
+    if _we_are_frozen():
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.getcwd()
 
-    return os.getcwd()
-
-
-def get_plugin_manager() -> PluginManager:
-    plugin_path = os.path.join(module_path(), "plugins")
-
-    pm = PluginManager()
-    pm.setPluginPlaces([plugin_path])
-
-    return pm
+    return os.path.join(base_path, "plugins")
 
 
 def timing(f):
