@@ -149,7 +149,7 @@
   <customwidget>
    <class>CSVViewer</class>
    <extends>QPlainTextEdit</extends>
-   <header location="global">..csvviewer</header>
+   <header location="global">app.widgets.csvviewer</header>
   </customwidget>
  </customwidgets>
  <resources/>

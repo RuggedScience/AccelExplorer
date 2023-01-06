@@ -1,8 +1,16 @@
 from PySide6.QtWidgets import QPlainTextEdit, QWidget, QTextEdit
-from PySide6.QtGui import QPainter, QPaintEvent, QResizeEvent, QColor, QTextFormat, QTextCursor
+from PySide6.QtGui import (
+    QPainter,
+    QPaintEvent,
+    QResizeEvent,
+    QColor,
+    QTextFormat,
+    QTextCursor,
+)
 from PySide6.QtCore import QRect, Qt, Signal
 
 from .linenumberarea import LineNumberArea
+
 
 class CSVViewer(QPlainTextEdit):
     lineNumberChanged = Signal(int)
@@ -23,7 +31,7 @@ class CSVViewer(QPlainTextEdit):
     def setCurrentLine(self, line: int) -> None:
         if line == self._line_number:
             return
-        
+
         block = self.document().findBlockByLineNumber(line - 1)
         cursor = QTextCursor(block)
         cursor.clearSelection()
@@ -35,14 +43,23 @@ class CSVViewer(QPlainTextEdit):
 
         block = self.firstVisibleBlock()
         blockNumber = block.blockNumber()
-        top = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        top = round(
+            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        )
         bottom = top + round(self.blockBoundingRect(block).height())
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 number = str(blockNumber + 1)
                 painter.setPen(Qt.black)
-                painter.drawText(0, top, self._lineNumberArea.width(), self.fontMetrics().height(), Qt.AlignRight, number)
+                painter.drawText(
+                    0,
+                    top,
+                    self._lineNumberArea.width(),
+                    self.fontMetrics().height(),
+                    Qt.AlignRight,
+                    number,
+                )
 
             block = block.next()
             top = bottom
@@ -58,7 +75,7 @@ class CSVViewer(QPlainTextEdit):
             m /= 10
             digits += 1
 
-        space = 3 + self.fontMetrics().horizontalAdvance('9') * digits
+        space = 3 + self.fontMetrics().horizontalAdvance("9") * digits
         return int(space)
 
     def updateLineNumberAreaWidth(self, newBlockCount: int) -> None:
@@ -68,7 +85,9 @@ class CSVViewer(QPlainTextEdit):
         if dy:
             self._lineNumberArea.scroll(0, dy)
         else:
-            self._lineNumberArea.update(0, rect.y(), self._lineNumberArea.width(), rect.height())
+            self._lineNumberArea.update(
+                0, rect.y(), self._lineNumberArea.width(), rect.height()
+            )
 
         if rect.contains(self.viewport().rect()):
             self.updateLineNumberAreaWidth(0)
@@ -77,7 +96,7 @@ class CSVViewer(QPlainTextEdit):
         line_number = self._getLineNumber()
         if line_number == self._line_number:
             return
-        
+
         extraSelections = []
 
         selection = QTextEdit.ExtraSelection()
@@ -98,7 +117,9 @@ class CSVViewer(QPlainTextEdit):
         super().resizeEvent(e)
 
         cr = self.contentsRect()
-        self._lineNumberArea.setGeometry(QRect(cr.left(), cr.top(), self.lineNumberAreaWidth(), cr.height()))
+        self._lineNumberArea.setGeometry(
+            QRect(cr.left(), cr.top(), self.lineNumberAreaWidth(), cr.height())
+        )
 
     def _getLineNumber(self) -> int:
         cursor = self.textCursor()

@@ -17,11 +17,12 @@ from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QAction, 
 from PySide6.QtCore import QEvent, QFileInfo, Qt, QPointF, QPoint, QTimer, QObject
 from PySide6.QtCharts import QValueAxis, QLineSeries, QChart
 
-from .utils import get_plugin_manager, timing
-from .plugins.dataview import DataView
-from .plugins.datafilter import DataFilter
-from .ui import resources_rc
-from .ui.ui_mainwindow import Ui_MainWindow
+from app.utils import get_plugin_manager, timing
+from app.plugins.dataview import DataView
+from app.plugins.datafilter import DataFilter
+from app.ui import resources_rc
+from app.ui.ui_mainwindow import Ui_MainWindow
+
 from .zoomchart import ZoomChart
 from .parserdialog import ParserDialog
 from .snapmdiarea import SnapMdiArea

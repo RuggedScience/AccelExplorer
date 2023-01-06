@@ -7,6 +7,7 @@ from PySide6.QtGui import QPaintEvent
 if TYPE_CHECKING:
     from .csvviewer import CSVViewer
 
+
 class LineNumberArea(QWidget):
     def __init__(self, viewer: "CSVViewer") -> None:
         super().__init__(viewer)

@@ -1,4 +1,5 @@
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
-    from app import app
-    sys.exit(app.run())
+    from app import run
+
+    sys.exit(run())

@@ -1,9 +1,4 @@
-from PySide6.QtWidgets import (
-    QMdiArea,
-    QWidget,
-    QMdiSubWindow,
-    QApplication
-)
+from PySide6.QtWidgets import QMdiArea, QWidget, QMdiSubWindow, QApplication
 from PySide6.QtGui import QMouseEvent, QResizeEvent, QKeyEvent
 from PySide6.QtCore import QRect, QPoint, QChildEvent, Qt, QObject, QEvent
 

@@ -6,9 +6,9 @@ from PySide6.QtGui import QBrush
 
 import pandas as pd
 
-from .utils import get_plugin_manager
-from .ui.ui_parserdialog import Ui_Dialog
-from .plugins.parsers import CSVParser, ParseError
+from ..utils import get_plugin_manager
+from ..ui.ui_parserdialog import Ui_Dialog
+from ..plugins.parsers import CSVParser, ParseError
 
 
 class ParserDialog(QDialog):
