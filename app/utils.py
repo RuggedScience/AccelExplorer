@@ -22,7 +22,7 @@ def module_path():
     if we_are_frozen():
         return os.path.dirname(sys.executable)
 
-    return os.path.dirname(__file__)
+    return os.getcwd()
 
 
 def get_plugin_manager() -> PluginManager:
