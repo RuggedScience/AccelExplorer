@@ -28,7 +28,7 @@ class ViewController(QObject):
 
         self._data_series: Dict[str, QLineSeries] = {}
 
-        self._marker_size = 15
+        self._marker_size = 10
         self._marker_count = 5
         self._display_markers = display_markers
         self._marker_generator = MarkerGenerator(50)
@@ -172,9 +172,16 @@ class ViewController(QObject):
             x_min = x[0]
             x_max = x[-1]
 
+        cols = [
+            series.name() for series in self._data_series.values() if series.isVisible()
+        ]
+
+        if not cols:
+            return
+
         # Add some margin to the y axis
-        y_min = self._df.min(axis=1).min()
-        y_max = self._df.max(axis=1).max()
+        y_min = self._df[cols].min(axis=1).min()
+        y_max = self._df[cols].max(axis=1).max()
         y_min -= abs(y_min * 0.1)
         y_max += abs(y_max * 0.1)
 
