@@ -8,19 +8,7 @@ import pandas as pd
 from app.plugins import parserplugins
 
 
-class AllenCSVParser(parserplugins.AccelCSVParser):
-    @property
-    def display_name(self) -> str:
-        return "Allen Parser"
-
-    @property
-    def header_row(self) -> int:
-        return 29
-
-    @property
-    def options(self) -> Dict[str, parserplugins.DataOption]:
-        return {}
-
+class AllenCSVParser(parserplugins.CSVParser):
     def can_parse(self, filename: str) -> bool:
         try:
             self._get_sample_rate(filename)
@@ -28,9 +16,13 @@ class AllenCSVParser(parserplugins.AccelCSVParser):
             return False
         return True
 
-    def parse(self, filename: str, **kwargs) -> pd.DataFrame:
+    def parse(self, filename: str) -> pd.DataFrame:
         sample_rate = self._get_sample_rate(filename)
-        df = super().parse(filename, sample_rate=sample_rate, **kwargs)
+        df = super().parse(
+            filename,
+            sample_rate=sample_rate,
+            header_row=29,
+        )
 
         # First column should be time which we don't need since
         # AccelCSVParser uses the sample rate to create a time index.

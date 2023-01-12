@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
 from app.plugins.dataframeplugins import FilterPlugin, ViewPlugin
-from app.plugins.parserplugins import AccelCSVParser, CSVParser
+from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import timing
 from app.viewcontroller import ViewController
@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
     def _load_plugins(self):
         pm: PluginManager = PluginManagerSingleton.get()
 
-        self._parsers: List[CSVParser] = [CSVParser(), AccelCSVParser()] + [
+        self._parsers: List[CSVParser] = [
             plugin.plugin_object for plugin in pm.getPluginsOfCategory("parsers")
         ]
 
@@ -168,28 +168,17 @@ class MainWindow(QMainWindow):
                 series = df.index.to_series()
                 df.index = series - series[0]
             else:
-
-                parsers = []
-                auto_parsers = []
-                for parser in self._parsers:
-                    if parser.can_parse(filename):
-                        parsers.append(parser)
-                        # If the parser doesn't offer any options and has no header row
-                        # that means it can parse the file without human input.
-                        if not parser.options and parser.header_row is not None:
-                            auto_parsers.append(parser)
-
                 df = None
-                # Try all of the auto parsers and remove any that fail
-                for parser in auto_parsers:
+                for parser in self._parsers:
                     try:
-                        df = auto_parsers[0].parse(filename)
-                    except:
-                        parsers.remove(parser)
+                        df = parser.parse(filename)
+                        break
+                    except Exception as ex:
+                        pass
 
                 # If the auto parser didn't work let's resort to the dialog
                 if df is None:
-                    dlg = ParserDialog(filename, parsers, parent=self)
+                    dlg = ParserDialog(filename, parent=self)
                     df = dlg.exec()
 
                 if df is None:

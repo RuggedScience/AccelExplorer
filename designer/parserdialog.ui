@@ -25,27 +25,13 @@
         <number>0</number>
        </property>
        <item row="0" column="0">
-        <widget class="QLabel" name="typeLabel">
-         <property name="text">
-          <string>Type</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QComboBox" name="typeComboBox">
-         <property name="currentText">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
         <widget class="QLabel" name="headerRowLabel">
          <property name="text">
           <string>Header Row</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="1">
+       <item row="0" column="1">
         <widget class="QSpinBox" name="headerRowSpinBox">
          <property name="minimum">
           <number>1</number>
@@ -55,21 +41,89 @@
          </property>
         </widget>
        </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_4">
-       <item>
-        <widget class="QLabel" name="label">
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_2">
          <property name="text">
-          <string>Columns</string>
+          <string>X-Axis</string>
          </property>
         </widget>
        </item>
-       <item>
-        <layout class="QVBoxLayout" name="headerLayout"/>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="indexComboBox"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>Type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="indexTypeComboBox">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <item>
+          <property name="text">
+           <string>Number</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Timestamp</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Seconds</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Milliseconds</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Microseconds</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Nanoseconds</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Sample Rate</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QSpinBox" name="sampleRateSpinBox">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>999999999</number>
+         </property>
+        </widget>
        </item>
       </layout>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="headerGroupBox">
+       <property name="title">
+        <string>Columns</string>
+       </property>
+       <layout class="QVBoxLayout" name="headerLayout"/>
+      </widget>
      </item>
     </layout>
    </item>
