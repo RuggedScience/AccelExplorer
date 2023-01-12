@@ -57,6 +57,7 @@ class MainWindow(QMainWindow):
         self.ui.yMajorTicks_spin.valueChanged.connect(self._update_tick_counts)
         self.ui.fitToContents_button.clicked.connect(self._fit_to_contents)
         self.ui.markerSize_spin.valueChanged.connect(self._update_markers)
+        self.ui.markerCount_spin.valueChanged.connect(self._update_markers)
         self.ui.marker_group.clicked.connect(self._update_markers)
 
         self._open_views: Dict[QTreeWidgetItem, ViewController] = {}
@@ -300,6 +301,7 @@ class MainWindow(QMainWindow):
         if controller:
             controller.display_markers = self.ui.marker_group.isChecked()
             controller.marker_size = self.ui.markerSize_spin.value()
+            controller.marker_count = self.ui.markerCount_spin.value()
 
     def _update_chart_ranges(self) -> None:
         item = self.ui.treeWidget.currentItem()
@@ -345,6 +347,7 @@ class MainWindow(QMainWindow):
             self._set_value_silent(self.ui.yMajorTicks_spin, y_axis.tickCount())
 
             self._set_value_silent(self.ui.markerSize_spin, controller.marker_size)
+            self._set_value_silent(self.ui.markerCount_spin, controller.marker_count)
             self.ui.marker_group.setChecked(controller.display_markers)
 
     def _current_tree_item_changed(

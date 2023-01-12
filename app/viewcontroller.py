@@ -29,6 +29,7 @@ class ViewController(QObject):
         self._data_series: Dict[str, QLineSeries] = {}
 
         self._marker_size = 15
+        self._marker_count = 5
         self._display_markers = display_markers
         self._marker_generator = MarkerGenerator(50)
 
@@ -120,9 +121,7 @@ class ViewController(QObject):
                 self._update_series_markers(series)
 
             if display:
-                start = self._x_axis.min()
-                end = self._x_axis.max()
-                self._update_marker_points(start, end)
+                self._update_marker_points()
 
     @property
     def marker_size(self) -> int:
@@ -134,6 +133,16 @@ class ViewController(QObject):
             for series in self._data_series.values():
                 series.setMarkerSize(size)
             self._marker_size = size
+
+    @property
+    def marker_count(self) -> int:
+        return self._marker_count
+
+    @marker_count.setter
+    def marker_count(self, count: int) -> None:
+        if self._marker_count != count:
+            self._marker_count = count
+            self._update_marker_points()
 
     def set_df(self, df: pd.DataFrame, title: str) -> None:
         cmd = DataCommand(title, self, self._df, df)
@@ -215,7 +224,7 @@ class ViewController(QObject):
         for name in added_cols:
             self._add_series(name)
 
-    def _update_points(self, series: QLineSeries, points: List[QPointF]) -> None:
+    def _update_series_points(self, series: QLineSeries, points: List[QPointF]) -> None:
         series.replace(points)
         # Only use OpenGL with large datasets
         use_opengl = len(points) > 100000
@@ -237,7 +246,7 @@ class ViewController(QObject):
             if isinstance(series, QLineSeries):
                 points = all_points.get(name)
                 if points is not None:
-                    self._update_points(series, points)
+                    self._update_series_points(series, points)
 
     def _update_series_markers(self, series: QLineSeries) -> None:
         if not self._display_markers:
@@ -248,9 +257,15 @@ class ViewController(QObject):
             series.setMarkerSize(self._marker_size)
             series.setSelectedLightMarker(self._marker_generator.next(series.color()))
 
-    def _update_marker_points(self, start: float, end: float) -> None:
+    def _update_marker_points(self, start: float = None, end: float = None) -> None:
+        if start is None:
+            start = self._x_axis.min()
+
+        if end is None:
+            end = self._x_axis.max()
+
         # Create linearly spaced points even with the axis tick counts
-        indices = np.linspace(start, end, self._x_axis.tickCount())
+        indices = np.linspace(start, end, self._marker_count)
 
         if self._df.index.inferred_type == "timedelta64":
             start = pd.to_timedelta(start, "S")
