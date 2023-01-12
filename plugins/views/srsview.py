@@ -3,17 +3,18 @@ from typing import Dict, List
 import pandas as pd
 import endaq
 
-from app.plugins import dataview
+from app.plugins import dataframeplugins
 from app.plugins.options import DataOption, NumericOption
 
 
-class SRSView(dataview.DataView):
-    x_title = "Frequency"
-    y_title = "Magnitude"
+class SRSView(dataframeplugins.ViewPlugin):
+    @property
+    def x_title(self) -> str:
+        return "Frequency"
 
     @property
-    def name(self) -> str:
-        return "SRS"
+    def y_title(self) -> str:
+        return "Magnitude"
 
     @property
     def options(self) -> Dict[str, DataOption]:
@@ -23,13 +24,10 @@ class SRSView(dataview.DataView):
             "dampening": NumericOption("Dampening", 5, 0, 100),
         }
 
-    @property
-    def index_types(self) -> List[str]:
-        return [
-            "timedelta64",
-        ]
+    def can_process(self, df: pd.DataFrame) -> bool:
+        return df.index.inferred_type in ["timedelta64", "datetime64"]
 
-    def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def process(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         min_x = kwargs.get("min_freq", 10)
         max_x = kwargs.get("max_freq", 1000)
         dampening = kwargs.get("dampening", 5) / 100

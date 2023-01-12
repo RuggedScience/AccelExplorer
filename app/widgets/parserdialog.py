@@ -1,52 +1,58 @@
-import os
-from typing import List
+from typing import Dict, List
 
 import pandas as pd
+from PySide6.QtCore import QFileInfo
+from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QMessageBox, QWidget
 
-from yapsy.PluginManager import PluginManager
-
-from PySide6.QtWidgets import QDialog, QWidget, QDialogButtonBox
-from PySide6.QtCore import QFileInfo, Qt
-from PySide6.QtGui import QBrush
-
-from app.utils import get_plugin_path
+from app.utils.optionsuimanager import OptionsUiManager
+from app.plugins.parserplugins import CSVParser, ParseError
 from app.ui.ui_parserdialog import Ui_Dialog
-from app.plugins.parsers import CSVParser, ParseError
 
 
 class ParserDialog(QDialog):
-    def __init__(self, filename: str, parent: QWidget = None) -> None:
+    def __init__(
+        self,
+        filename: str,
+        parsers: List[CSVParser],
+        default_parser: CSVParser = None,
+        parent: QWidget = None,
+    ) -> None:
         super().__init__(parent)
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
 
+        self._options_manager = OptionsUiManager(self.ui.optionsLayout)
+        self._options_manager.change_callback = self._update_headers
+
         self.ui.buttonBox.button(QDialogButtonBox.Ok).setText("Parse")
 
-        pm = PluginManager()
-        pm.setPluginPlaces([os.path.join(get_plugin_path(), "parsers")])
-        pm.setCategoriesFilter({"Parsers": CSVParser})
-        pm.collectPlugins()
+        self._parsers: Dict[str, CSVParser] = {
+            parser.display_name: parser for parser in parsers
+        }
 
-        self.parsers = {"Generic Parser": CSVParser()}
-        for plugin in pm.getPluginsOfCategory("Parsers"):
-            if isinstance(plugin.plugin_object, CSVParser):
-                self.parsers[plugin.plugin_object.name] = plugin.plugin_object
-
-        self.ui.typeComboBox.addItems(self.parsers.keys())
+        self.ui.typeComboBox.addItems(self._parsers.keys())
 
         self.ui.typeComboBox.currentTextChanged.connect(self._typeChanged)
-        self.ui.timeUnitsComboBox.currentTextChanged.connect(self._update_ui)
         self.ui.headerRowSpinBox.valueChanged.connect(self._headerRowChanged)
         self.ui.csvViewer.lineNumberChanged.connect(self.ui.headerRowSpinBox.setValue)
 
         self.setCSVFile(filename)
-        self._headerRowChanged(self.ui.headerRowSpinBox.value())
+
+        if default_parser:
+            self.ui.typeComboBox.setCurrentText(default_parser.display_name)
+
+        self._typeChanged()
 
         self._df = None
 
     @property
     def df(self) -> pd.DataFrame:
         return self._df
+
+    @property
+    def _parser(self) -> CSVParser:
+        parser_name = self.ui.typeComboBox.currentText()
+        return self._parsers[parser_name]
 
     def setCSVFile(self, filename: str) -> None:
         info = QFileInfo(filename)
@@ -57,73 +63,62 @@ class ParserDialog(QDialog):
 
         self._filename = filename
 
-        # Try all of the specific parsers to see
-        # if any successfully parse the CSV file.
-
-        found = False
-        for i, parser in enumerate(self.parsers.values()):
-            # If either one of these is none, the parser requires
-            # user input to properly work. Skip those.
-            if (
-                parser.sample_rate is None and parser.time_units is None
-            ) or parser.header_row is None:
-                continue
-
-            if parser.can_parse(filename):
-                if not found:
-                    self.ui.typeComboBox.setCurrentIndex(i)
-                    self._update_ui()
-                    found = True
-            else:
-                self.ui.typeComboBox.setItemData(i, QBrush(Qt.red), Qt.BackgroundRole)
-
     def _typeChanged(self) -> None:
         parser_type = self.ui.typeComboBox.currentText()
-        parser = self.parsers[parser_type]
+        parser = self._parsers[parser_type]
 
-        self.ui.timeUnitsComboBox.setCurrentText(parser.time_units or "None")
+        header_row = parser.header_row or 1
+        self.ui.headerRowSpinBox.setValue(header_row)
+        self._headerRowChanged(header_row)
 
-        if parser.header_row:
-            self.ui.headerRowSpinBox.setValue(parser.header_row)
-
-        self._update_ui()
-
-    def _update_ui(self) -> None:
-        parser_type = self.ui.typeComboBox.currentText()
-        parser = self.parsers[parser_type]
-
-        self.ui.timeUnitsComboBox.setEnabled(parser.time_units is None)
-
-        time_units = self.ui.timeUnitsComboBox.currentText()
-        self.ui.sampleRateSpinBox.setEnabled(
-            parser.sample_rate is None and time_units == "None"
-        )
-
-        self.ui.headerRowSpinBox.setEnabled(parser.header_row is None)
+        self._options_manager.options = parser.options
 
     def _headerRowChanged(self, value: int) -> None:
         self.ui.csvViewer.setCurrentLine(value)
+        self._update_headers()
+
+    def _update_headers(self) -> None:
+        while self.ui.headerLayout.count():
+            child = self.ui.headerLayout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        line = self.ui.headerRowSpinBox.value()
+        options = self._options_manager.values
+        headers = self._parser.get_headers(self._filename, line, **options)
+        for header in headers:
+            cb = QCheckBox(header)
+            cb.setChecked(True)
+            self.ui.headerLayout.addWidget(cb)
 
     def accept(self) -> None:
-        name = self.ui.typeComboBox.currentText()
-        parser = self.parsers[name]
+        header_row = self.ui.headerRowSpinBox.value()
+        parser = self._parsers[self.ui.typeComboBox.currentText()]
 
-        time_units = self.ui.timeUnitsComboBox.currentText()
-        if self.ui.timeUnitsComboBox.isEnabled() and time_units != "None":
-            parser.time_units = time_units.lower()
-        else:
-            parser.sample_rate = self.ui.sampleRateSpinBox.value()
-
-        if self.ui.headerRowSpinBox.isEnabled():
-            parser.header_row = self.ui.headerRowSpinBox.value()
+        usecols = []
+        for i in range(self.ui.headerLayout.count()):
+            item = self.ui.headerLayout.itemAt(i)
+            widget = item.widget()
+            if isinstance(widget, QCheckBox):
+                if widget.isChecked():
+                    usecols.append(widget.text())
 
         try:
-            self._df = parser.parse(self._filename)
+            options = self._options_manager.values
+            self._df = parser.parse(
+                self._filename, header_row=header_row, usecols=usecols, **options
+            )
+            return super().accept()
+        except ValueError as ex:
+            QMessageBox.warning(
+                self,
+                "Parsing Error",
+                "Unable to parse file.\nVerify the header row is correct.",
+            )
         except ParseError as ex:
-            print(ex)
-            return
+            QMessageBox.warning(self, "Parsing Error", str(ex))
 
-        if parser.sample_rate != None:
-            self.ui.sampleRateSpinBox.setValue(parser.sample_rate)
-
-        return super().accept()
+    def exec(self) -> pd.DataFrame:
+        ret = super().exec()
+        if ret:
+            return self._df

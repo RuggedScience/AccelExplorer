@@ -1,8 +1,14 @@
-from typing import Dict, List, Tuple
+from typing import List
 
-from PySide6.QtCharts import QChartView, QValueAxis
-from PySide6.QtCore import QPoint, QPointF, Qt
-from PySide6.QtGui import QCursor, QKeyEvent, QMouseEvent, QResizeEvent, QWheelEvent
+from PySide6.QtCharts import QChartView, QChart
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import (
+    QCursor,
+    QKeyEvent,
+    QMouseEvent,
+    QResizeEvent,
+    QWheelEvent,
+)
 from PySide6.QtWidgets import QApplication
 
 from .callout import Callout
@@ -13,19 +19,20 @@ def control_pressed() -> bool:
     return modifiers == Qt.ControlModifier
 
 
-class ZoomChart(QChartView):
+class InteractiveChart(QChartView):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.setRubberBand(
             QChartView.HorizontalRubberBand | QChartView.ClickThroughRubberBand
         )
+
         self._callouts: List[Callout] = []
 
         self._tool_tip = self.add_callout(QPointF(0, 0), "")
         self._tool_tip.hide()
-        self._prev_ranges: Dict[QValueAxis, Tuple[float, float]] = None
 
         self._last_mouse_pos = None
+        self._old_plot_area = None
 
     @property
     def tooltip(self) -> Callout:
@@ -51,13 +58,16 @@ class ZoomChart(QChartView):
         self._callouts.append(callout)
         return callout
 
+    def _zoom(self, rect: QRectF) -> None:
+        self.chart().zoomIn(rect)
+
     def _zoom_x(self, factor: float) -> None:
         rect = self.chart().plotArea()
         original_width = rect.width()
         original_center = rect.center()
         rect.setWidth(original_width / factor)
         rect.moveCenter(original_center)
-        self.chart().zoomIn(rect)
+        self._zoom(rect)
 
     def _zoom_y(self, factor: float) -> None:
         rect = self.chart().plotArea()
@@ -65,7 +75,7 @@ class ZoomChart(QChartView):
         original_center = rect.center()
         rect.setWidth(original_height / factor)
         rect.moveCenter(original_center)
-        self.chart().zoomIn(rect)
+        self._zoom(rect)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         if (
@@ -94,15 +104,6 @@ class ZoomChart(QChartView):
         ):
             QApplication.setOverrideCursor(QCursor(Qt.SizeAllCursor))
             self._last_mouse_pos = event.pos()
-
-            # Store the previous axis ranges
-            # so we can reset the view later.
-            if self._prev_ranges is None:
-                self._prev_ranges = {}
-                for axis in self.chart().axes():
-                    if isinstance(axis, QValueAxis):
-                        self._prev_ranges[axis] = (axis.min(), axis.max())
-
             event.accept()
         else:
             QApplication.restoreOverrideCursor()
@@ -122,7 +123,9 @@ class ZoomChart(QChartView):
             elif self.rubberBand() & QChartView.VerticalRubberBand:
                 d_pos.setX(0)
 
-            self.chart().scroll(-d_pos.x(), d_pos.y())
+            d_pos.setX(-d_pos.x())
+            self.chart().scroll(d_pos.x(), d_pos.y())
+
             self._last_mouse_pos = event.pos()
             self._update_callouts()
         else:
@@ -141,9 +144,6 @@ class ZoomChart(QChartView):
         if control_pressed() and event.key() == Qt.Key_R:
             chart = self.chart()
             chart.zoomReset()
-            if not self._prev_ranges is None:
-                for axis, range in self._prev_ranges.items():
-                    axis.setRange(*range)
 
         self._update_callouts()
         return super().keyReleaseEvent(event)

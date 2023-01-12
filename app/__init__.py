@@ -1,12 +1,16 @@
-from .version import __version__
+import logging
+import os
 
 from PySide6.QtWidgets import QApplication
+from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
-from . import __version__
-from .widgets.mainwindow import MainWindow
+from app.plugins.dataframeplugins import DataFramePlugin
+from app.plugins.parserplugins import ParserPlugin
+from app.utils import get_plugin_path
+from app.version import __version__
+from app.widgets.mainwindow import MainWindow
 
-# import logging
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARN)
 
 QApplication.setOrganizationName("Rugged Science")
 QApplication.setOrganizationDomain("ruggedscience.com")
@@ -15,6 +19,20 @@ QApplication.setApplicationVersion(__version__)
 
 
 def run():
+    plugin_path = get_plugin_path()
+
+    pm: PluginManager = PluginManagerSingleton.get()
+    pm.setPluginPlaces(
+        [
+            os.path.join(plugin_path, "parsers"),
+            os.path.join(plugin_path, "filters"),
+            os.path.join(plugin_path, "views"),
+        ]
+    )
+    pm.setCategoriesFilter(
+        {"parsers": ParserPlugin, "dataframe": DataFramePlugin})
+    pm.collectPlugins()
+
     app = QApplication([])
     widget = MainWindow()
     widget.show()

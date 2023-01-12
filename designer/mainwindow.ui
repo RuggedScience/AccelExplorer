@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>1045</width>
     <height>600</height>
    </rect>
   </property>
@@ -71,12 +71,250 @@
     </layout>
    </widget>
   </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="separator"/>
+  </widget>
+  <widget class="QDockWidget" name="chartSettingsDockWidget">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="windowTitle">
+    <string>Chart</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_3">
+    <layout class="QVBoxLayout" name="verticalLayout_4">
+     <item>
+      <widget class="QGroupBox" name="yAxis_group">
+       <property name="title">
+        <string>Y Axis</string>
+       </property>
+       <layout class="QFormLayout" name="formLayout_2">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>Minor Ticks</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QSpinBox" name="yMinorTicks_spin"/>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>Major Ticks</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QSpinBox" name="yMajorTicks_spin"/>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="label_5">
+          <property name="text">
+           <string>Min</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QDoubleSpinBox" name="yMin_spin">
+          <property name="minimum">
+           <double>-1000000000000000000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>1000000000000000013287555072.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="label_6">
+          <property name="text">
+           <string>Max</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QDoubleSpinBox" name="yMax_spin">
+          <property name="minimum">
+           <double>-1000000000000000000000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>100000000000000004764729344.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="xAxis_group">
+       <property name="title">
+        <string>X Axis</string>
+       </property>
+       <layout class="QFormLayout" name="formLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_4">
+          <property name="text">
+           <string>Minor Ticks</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QSpinBox" name="xMinorTicks_spin"/>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Major Ticks</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QSpinBox" name="xMajorTicks_spin"/>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="label_7">
+          <property name="text">
+           <string>Min</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QDoubleSpinBox" name="xMin_spin">
+          <property name="minimum">
+           <double>-1000000000000000000000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>100000000000000004764729344.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="label_8">
+          <property name="text">
+           <string>Max</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QDoubleSpinBox" name="xMax_spin">
+          <property name="minimum">
+           <double>-1000000000000000000000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>100000000000000004764729344.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="marker_group">
+       <property name="title">
+        <string>Markers</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <layout class="QFormLayout" name="formLayout_3">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_9">
+          <property name="text">
+           <string>Size</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QSpinBox" name="markerSize_spin">
+          <property name="minimum">
+           <number>5</number>
+          </property>
+          <property name="maximum">
+           <number>50</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="fitToContents_button">
+       <property name="text">
+        <string>Fit to Contents</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </widget>
+  </widget>
   <action name="actionOpen">
    <property name="text">
     <string>Open</string>
    </property>
   </action>
+  <action name="actionCrop">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/crop.png</normaloff>:/icons/crop.png</iconset>
+   </property>
+   <property name="text">
+    <string>Crop</string>
+   </property>
+   <property name="toolTip">
+    <string>Crop current view to visible contents</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/export.png</normaloff>:/icons/export.png</iconset>
+   </property>
+   <property name="text">
+    <string>Export</string>
+   </property>
+   <property name="toolTip">
+    <string>Export current view to file</string>
+   </property>
+  </action>
  </widget>
+ <tabstops>
+  <tabstop>treeWidget</tabstop>
+  <tabstop>undoView</tabstop>
+  <tabstop>yMinorTicks_spin</tabstop>
+  <tabstop>yMajorTicks_spin</tabstop>
+  <tabstop>yMin_spin</tabstop>
+  <tabstop>yMax_spin</tabstop>
+  <tabstop>xMinorTicks_spin</tabstop>
+  <tabstop>xMajorTicks_spin</tabstop>
+  <tabstop>xMin_spin</tabstop>
+  <tabstop>xMax_spin</tabstop>
+ </tabstops>
  <resources>
   <include location="../resources.qrc"/>
  </resources>

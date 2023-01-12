@@ -1,7 +1,7 @@
-from numbers import Number
-from typing import List, Tuple
-from dataclasses import dataclass
 from collections import namedtuple
+from dataclasses import dataclass
+from numbers import Number
+from typing import List
 
 
 @dataclass

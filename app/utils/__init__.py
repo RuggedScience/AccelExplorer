@@ -1,8 +1,14 @@
 import os
 import sys
 
+from typing import List, Dict
+
 from functools import wraps
 from time import time
+
+import pandas as pd
+
+from PySide6.QtCore import QPointF
 
 
 def _we_are_frozen():
@@ -34,3 +40,18 @@ def timing(f):
         return result
 
     return wrap
+
+
+def series_to_points(series: pd.Series) -> List[QPointF]:
+    if series.index.inferred_type == "timedelta64":
+        series.index = series.index.total_seconds()
+
+    return [QPointF(float(i), float(v)) for i, v in series.items()]
+
+
+def df_to_points(df: pd.DataFrame) -> Dict[str, List[QPointF]]:
+    d = {}
+    for col, series in df.items():
+        points = series_to_points(series)
+        d[col] = points
+    return d

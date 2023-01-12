@@ -1,20 +1,22 @@
-from typing import Dict, List
+from typing import Dict
 
+import numpy as np
 import pandas as pd
 import endaq as ed
 
 
-from app.plugins import dataview
+from app.plugins import dataframeplugins
 from app.plugins.options import DataOption, NumericOption
 
 
-class FFTView(dataview.DataView):
-    x_title = "Frequency"
-    y_title = "Magnitude"
+class FFTView(dataframeplugins.ViewPlugin):
+    @property
+    def x_title(self) -> str:
+        return "Frequency"
 
     @property
-    def name(self) -> str:
-        return "FFT"
+    def y_title(self) -> str:
+        return "Magnitude"
 
     @property
     def options(self) -> Dict[str, DataOption]:
@@ -23,15 +25,13 @@ class FFTView(dataview.DataView):
             "max_freq": NumericOption("Max Frequency", 1000, 1, None),
         }
 
-    @property
-    def index_types(self) -> List[str]:
-        return [
-            "timedelta64",
-        ]
+    def can_process(self, df: pd.DataFrame) -> bool:
+        return df.index.inferred_type in ["timedelta64", "datetime64"]
 
-    def generate(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def process(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         min_x = kwargs.get("min_freq", 10)
         max_x = kwargs.get("max_freq", 1000)
 
         fft: pd.DataFrame = ed.calc.fft.fft(df)
-        return fft[(fft.index >= min_x) & (fft.index <= max_x)]
+        fft = fft[(fft.index >= min_x) & (fft.index <= max_x)]
+        return fft

@@ -3,15 +3,11 @@ from typing import Dict, List
 import endaq as ed
 import pandas as pd
 
-from app.plugins import datafilter
+from app.plugins import dataframeplugins
 from app.plugins.options import DataOption, NumericOption
 
 
-class ButterworthFilter(datafilter.DataFilter):
-    @property
-    def name(self) -> str:
-        return "Butterworth"
-
+class ButterworthFilter(dataframeplugins.FilterPlugin):
     @property
     def options(self) -> Dict[str, DataOption]:
         return {
@@ -20,13 +16,10 @@ class ButterworthFilter(datafilter.DataFilter):
             "half_order": NumericOption("Half Order", 3, 0, None),
         }
 
-    @property
-    def index_types(self) -> List[str]:
-        return [
-            "timedelta64",
-        ]
+    def can_process(self, df: pd.DataFrame) -> bool:
+        return df.index.inferred_type in ["timedelta64", "datetime64"]
 
-    def filter(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def process(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         if kwargs.get("low_cutoff") == 0:
             kwargs.pop("low_cutoff")
         if kwargs.get("high_cutoff") == 0:
