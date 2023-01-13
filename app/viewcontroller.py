@@ -166,8 +166,8 @@ class ViewController(QObject):
         if self._display_markers != display:
             self._display_markers = display
             self._marker_generator.reset()
-            for series in self._data_series.values():
-                self._update_series_markers(series)
+            for series in self._view_series.values():
+                self._update_series_markers(series.chart_series)
 
             if display:
                 self._update_marker_points()
@@ -179,8 +179,8 @@ class ViewController(QObject):
     @marker_size.setter
     def marker_size(self, size: int) -> None:
         if self._marker_size != size:
-            for series in self._data_series.values():
-                series.setMarkerSize(size)
+            for series in self._view_series.values():
+                series.chart_series.setMarkerSize(size)
             self._marker_size = size
 
     @property
@@ -249,6 +249,7 @@ class ViewController(QObject):
         self._undo_stack.push(cmd)
 
     def fit_contents(self) -> None:
+        # Get a list of visible series
         cols = [
             series.name
             for series in self._view_series.values()
@@ -258,7 +259,10 @@ class ViewController(QObject):
         if not cols:
             return
 
+        # Create a dataframe with only the visible data
         df = self._df[cols]
+        # Drop rows missing all data. This gives us accurate
+        # min/max values for our visible series.
         df = df.dropna(how="all")
 
         x_min = df.index.min()
@@ -267,9 +271,9 @@ class ViewController(QObject):
             x_min = x_min.total_seconds()
             x_max = x_max.total_seconds()
 
-        # Add some margin to the y axis
         y_min = df.min(axis=1).min()
         y_max = df.max(axis=1).max()
+        # Add some margin to the y axis
         y_min -= abs(y_min * 0.1)
         y_max += abs(y_max * 0.1)
 
