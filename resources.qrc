@@ -1,5 +1,9 @@
 <RCC>
   <qresource prefix="/">
+    <file>icons/fft.png</file>
+    <file>icons/srs.png</file>
+    <file>icons/close.png</file>
+    <file>icons/open.png</file>
     <file>icons/crop.png</file>
     <file>icons/export.png</file>
     <file>icons/accel_icon.png</file>

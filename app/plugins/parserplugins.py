@@ -70,5 +70,8 @@ class CSVParser(ParserPlugin):
                 if start_time != 0:
                     df.index = df.index - start_time
             df.index = pd.to_timedelta(df.index, unit=time_units)
+
+        if df.index.inferred_type == "timedelta64":
             df.index.rename("Time (s)", inplace=True)
+
         return df

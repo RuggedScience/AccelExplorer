@@ -81,7 +81,13 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="actionOpen"/>
+   <addaction name="actionClose"/>
+   <addaction name="actionExport"/>
    <addaction name="separator"/>
+   <addaction name="actionCrop"/>
+   <addaction name="actionFFT"/>
+   <addaction name="actionSRS"/>
   </widget>
   <widget class="QDockWidget" name="chartSettingsDockWidget">
    <property name="enabled">
@@ -291,11 +297,21 @@
    </widget>
   </widget>
   <action name="actionOpen">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/open.png</normaloff>:/icons/open.png</iconset>
+   </property>
    <property name="text">
     <string>Open</string>
    </property>
+   <property name="toolTip">
+    <string>Open CSV File</string>
+   </property>
   </action>
   <action name="actionCrop">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="icon">
     <iconset resource="../resources.qrc">
      <normaloff>:/icons/crop.png</normaloff>:/icons/crop.png</iconset>
@@ -308,6 +324,9 @@
    </property>
   </action>
   <action name="actionExport">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="icon">
     <iconset resource="../resources.qrc">
      <normaloff>:/icons/export.png</normaloff>:/icons/export.png</iconset>
@@ -317,6 +336,45 @@
    </property>
    <property name="toolTip">
     <string>Export current view to file</string>
+   </property>
+  </action>
+  <action name="actionClose">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/close.png</normaloff>:/icons/close.png</iconset>
+   </property>
+   <property name="text">
+    <string>Close</string>
+   </property>
+   <property name="toolTip">
+    <string>Close current view</string>
+   </property>
+  </action>
+  <action name="actionFFT">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/fft.png</normaloff>:/icons/fft.png</iconset>
+   </property>
+   <property name="text">
+    <string>FFT</string>
+   </property>
+   <property name="toolTip">
+    <string>Run FFT on current view</string>
+   </property>
+  </action>
+  <action name="actionSRS">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/srs.png</normaloff>:/icons/srs.png</iconset>
+   </property>
+   <property name="text">
+    <string>SRS</string>
+   </property>
+   <property name="toolTip">
+    <string>Run SRS on current view</string>
    </property>
   </action>
  </widget>

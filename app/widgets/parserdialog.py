@@ -1,5 +1,5 @@
 import linecache
-from typing import Dict, List
+from typing import Dict
 
 import pandas as pd
 from PySide6.QtCore import QFileInfo
@@ -51,7 +51,9 @@ class ParserDialog(QDialog):
                 cb.setChecked(True)
             cb.setHidden(name == currentIndex)
 
-        self.ui.indexTypeComboBox.setEnabled(currentIndex != "None")
+        self.ui.indexTypeComboBox.setEnabled(
+            currentIndex not in ("None", "Sample Rate")
+        )
         self.ui.sampleRateSpinBox.setEnabled(currentIndex == "Sample Rate")
 
     def _headerRowChanged(self, value: int) -> None:
