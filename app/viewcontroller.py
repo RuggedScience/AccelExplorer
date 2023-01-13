@@ -8,12 +8,37 @@ from PySide6.QtCore import QObject, QPointF, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QUndoStack, QImage
 from PySide6.QtWidgets import QTreeWidgetItem
 
-from app.commands.viewcommands import CropCommand, DataCommand
+from app.commands.viewcommands import CropCommand, DataCommand, AddDataCommand
 from app.utils import df_to_points
 from app.utils.markergenerator import MarkerGenerator
 from app.widgets.interactivechart import InteractiveChart
 
 AxisRanges = namedtuple("AxisRanges", ["x_min", "x_max", "y_min", "y_max"])
+
+
+class ViewSeries:
+    def __init__(self, name: str, parent: QTreeWidgetItem = None) -> None:
+        self._chart_series = QLineSeries()
+        self._tree_item = QTreeWidgetItem(parent)
+        self.name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, name: str) -> None:
+        self._chart_series.setName(name)
+        self._tree_item.setText(0, name)
+        self._name = name
+
+    @property
+    def chart_series(self) -> QLineSeries:
+        return self._chart_series
+
+    @property
+    def tree_item(self) -> QTreeWidgetItem:
+        return self._tree_item
 
 
 class ViewController(QObject):
@@ -26,7 +51,7 @@ class ViewController(QObject):
     ):
         super().__init__(parent)
 
-        self._data_series: Dict[str, QLineSeries] = {}
+        self._view_series: Dict[QTreeWidgetItem, ViewSeries] = {}
 
         self._marker_size = 10
         self._marker_count = 5
@@ -60,6 +85,30 @@ class ViewController(QObject):
         self._y_axis.rangeChanged.connect(self._axis_range_changed)
 
         self._axis_range_changed()
+
+    def __getitem__(self, key: QTreeWidgetItem | str) -> ViewSeries:
+        series = None
+        name = ""
+        if isinstance(key, QTreeWidgetItem):
+            name = key.text(0)
+            series = self._view_series.get(key)
+        elif isinstance(key, str):
+            name = key
+            series = self._get_series_from_name(key)
+
+        if series is None:
+            raise KeyError(f"{name} not in {self.name}")
+
+        return series
+
+    def __contains__(self, key: QTreeWidgetItem | str) -> bool:
+        if isinstance(key, QTreeWidgetItem):
+            return key in self._view_series
+        elif isinstance(key, str):
+            return self._get_series_from_name(key) is not None
+
+    def __iter__(self):
+        yield from self._view_series.values()
 
     @property
     def name(self) -> str:
@@ -148,6 +197,42 @@ class ViewController(QObject):
         cmd = DataCommand(title, self, self._df, df)
         self._undo_stack.push(cmd)
 
+    def can_add_data(self, df: pd.DataFrame) -> bool:
+        return df.index.inferred_type == self._df.index.inferred_type
+
+    def add_data(
+        self,
+        name: str,
+        df: pd.DataFrame,
+        points: Dict[str, List[QPointF]] = None,
+    ) -> None:
+        for col in df:
+            i = 1
+            old_name = col
+            while col in self._df:
+                col = f"{col} ({i})"
+                i += 1
+
+            if old_name != col:
+                df.rename(columns={old_name: col}, inplace=True)
+
+        if points is None:
+            points = df_to_points(df)
+
+        cmd = AddDataCommand(name, self, df, points)
+        self._undo_stack.push(cmd)
+
+    def _add_data(self, df: pd.DataFrame, points: Dict[str, List[QPointF]]):
+        self._df = pd.concat([self._df, df], axis="columns")
+        for name, data in points.items():
+            series = self._add_series(name)
+            series.chart_series.replace(data)
+
+    def _remove_data(self, df: pd.DataFrame) -> None:
+        self._df.drop(df.columns, axis="columns", inplace=True)
+        for col in df:
+            self._remove_series(col)
+
     def crop(self) -> None:
         x_min = self._x_axis.min()
         x_max = self._x_axis.max()
@@ -164,28 +249,44 @@ class ViewController(QObject):
         self._undo_stack.push(cmd)
 
     def fit_contents(self) -> None:
-        x = self._df.index
-        if isinstance(x, pd.TimedeltaIndex):
-            x_min = x.min().total_seconds()
-            x_max = x.max().total_seconds()
-        else:
-            x_min = x[0]
-            x_max = x[-1]
-
         cols = [
-            series.name() for series in self._data_series.values() if series.isVisible()
+            series.name
+            for series in self._view_series.values()
+            if series.chart_series.isVisible()
         ]
 
         if not cols:
             return
 
+        df = self._df[cols]
+        df = df.dropna(how="all")
+
+        x_min = df.index.min()
+        x_max = df.index.max()
+        if df.index.inferred_type == "timedelta64":
+            x_min = x_min.total_seconds()
+            x_max = x_max.total_seconds()
+
         # Add some margin to the y axis
-        y_min = self._df[cols].min(axis=1).min()
-        y_max = self._df[cols].max(axis=1).max()
+        y_min = df.min(axis=1).min()
+        y_max = df.max(axis=1).max()
         y_min -= abs(y_min * 0.1)
         y_max += abs(y_max * 0.1)
 
         self.setAxisRanges(x_min, x_max, y_min, y_max)
+
+    def rename_series(self, series: QTreeWidgetItem | str, name: str):
+        view_series = None
+        if isinstance(series, QTreeWidgetItem):
+            view_series = self._view_series.get(series)
+        elif isinstance(series, str):
+            view_series = self._get_series_from_name(series)
+
+        if view_series is None or view_series.name not in self._df:
+            raise ValueError(f"Series not in {self.name}")
+
+        self._df.rename(columns={view_series.name: name}, inplace=True)
+        view_series.name = name
 
     def _point_hovered(self, pos: QPointF, state: bool):
         if state:
@@ -198,29 +299,45 @@ class ViewController(QObject):
         else:
             self.chart_view.tooltip.hide()
 
-    def _add_series(self, name: str) -> QLineSeries:
-        if name in self._data_series:
-            raise ValueError("Series already exists")
+    def _add_series(self, name: str) -> ViewSeries:
+        view_series = ViewSeries(name, self._tree_item)
 
-        series = QLineSeries()
-        series.setName(name)
-        self.chart.addSeries(series)
-        series.attachAxis(self._x_axis)
-        series.attachAxis(self._y_axis)
-        series.hovered.connect(self._point_hovered)
-        series.clicked.connect(self.chart_view.keep_tooltip)
-        self._data_series[name] = series
-        self._update_series_markers(series)
-        return series
+        chart_series = view_series.chart_series
+        self.chart.addSeries(chart_series)
+        chart_series.attachAxis(self._x_axis)
+        chart_series.attachAxis(self._y_axis)
+        chart_series.hovered.connect(self._point_hovered)
+        chart_series.clicked.connect(self.chart_view.keep_tooltip)
 
-    def _remove_series(self, name: str) -> None:
-        series = self._data_series.pop(name)
-        self.chart.removeSeries(series)
-        series.deleteLater()
+        tree_item = view_series.tree_item
+        tree_item.setCheckState(0, Qt.Checked)
+
+        self._view_series[tree_item] = view_series
+
+        self._update_series_markers(chart_series)
+
+        return view_series
+
+    def _remove_series(self, series: str | QTreeWidgetItem | ViewSeries) -> None:
+        view_series = None
+        if isinstance(series, str):
+            view_series = self._get_series_from_name(series)
+        elif isinstance(series, QTreeWidgetItem):
+            view_series = self._view_series.get(series)
+        elif isinstance(series, ViewSeries):
+            view_series = series
+
+        if view_series is None:
+            raise ValueError(f"Could not find {series} in {self.name}")
+
+        self._view_series.pop(view_series.tree_item)
+        self._tree_item.removeChild(view_series.tree_item)
+        self.chart.removeSeries(view_series.chart_series)
+        view_series.chart_series.deleteLater()
 
     def _update_series(self) -> None:
         new_names = {str(col) for col in self._df}
-        old_names = set(self._data_series.keys())
+        old_names = {s.name for s in self._view_series.values()}
 
         added_cols = new_names.difference(old_names)
         removed_cols = old_names.difference(new_names)
@@ -231,7 +348,14 @@ class ViewController(QObject):
         for name in added_cols:
             self._add_series(name)
 
-    def _update_series_points(self, series: QLineSeries, points: List[QPointF]) -> None:
+    def _update_series_points(
+        self,
+        series: QLineSeries | ViewSeries,
+        points: List[QPointF],
+    ) -> None:
+        if isinstance(series, ViewSeries):
+            series = series.chart_series
+
         series.replace(points)
         # Only use OpenGL with large datasets
         use_opengl = len(points) > 100000
@@ -249,11 +373,10 @@ class ViewController(QObject):
         self._update_series()
         all_points = df_to_points(df)
 
-        for name, series in self._data_series.items():
-            if isinstance(series, QLineSeries):
-                points = all_points.get(name)
-                if points is not None:
-                    self._update_series_points(series, points)
+        for view_series in self._view_series.values():
+            points = all_points.get(view_series.name)
+            if points is not None:
+                self._update_series_points(view_series.chart_series, points)
 
     def _update_series_markers(self, series: QLineSeries) -> None:
         if not self._display_markers:
@@ -280,9 +403,9 @@ class ViewController(QObject):
             indices = pd.to_timedelta(indices, "S")
 
         points = self._df.index.get_indexer(indices, method="nearest")
-        for series in self._data_series.values():
-            series.deselectAllPoints()
-            series.selectPoints(points)
+        for series in self._view_series.values():
+            series.chart_series.deselectAllPoints()
+            series.chart_series.selectPoints(points)
 
     def setAxisRanges(
         self,
@@ -299,3 +422,8 @@ class ViewController(QObject):
 
         if self._display_markers:
             self._update_marker_points(ranges.x_min, ranges.x_max)
+
+    def _get_series_from_name(self, name: str) -> ViewSeries:
+        for s in self._view_series.values():
+            if s.name == name:
+                return s

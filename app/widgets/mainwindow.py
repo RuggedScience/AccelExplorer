@@ -1,29 +1,21 @@
 from collections.abc import Iterable
-from typing import Dict, List
+from typing import List
 
 import endaq as ed
 import pandas as pd
 from PySide6.QtCore import QFileInfo, QSettings, Qt, QTimer
-from PySide6.QtGui import (
-    QAction,
-    QCloseEvent,
-    QDragEnterEvent,
-    QDragMoveEvent,
-    QDropEvent,
-)
+from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QMainWindow,
-    QMenu,
-    QTreeWidgetItem,
     QSpinBox,
+    QTreeWidgetItem,
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
-from app.plugins.dataframeplugins import FilterPlugin, ViewPlugin
-from app.plugins.parserplugins import CSVParser
 from app.plugins.options import NumericOption
+from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import timing
 from app.viewcontroller import ViewController
@@ -39,8 +31,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(
             f"{QApplication.applicationName()} {QApplication.applicationVersion()}[*]"
         )
-
-        self._open_views: Dict[QTreeWidgetItem, ViewController] = {}
 
         self._connect_signals()
         self._load_plugins()
@@ -74,9 +64,8 @@ class MainWindow(QMainWindow):
         self.ui.marker_group.clicked.connect(self._update_markers)
         self.ui.markerSize_spin.valueChanged.connect(self._update_markers)
         self.ui.markerCount_spin.valueChanged.connect(self._update_markers)
-        # Chart Fit to contents
-        self.ui.fitToContents_button.clicked.connect(self._fit_to_contents)
         # Actions
+        self.ui.actionFit_Contents.triggered.connect(self._fit_to_contents)
         self.ui.actionClose.triggered.connect(self._close_current_view)
         self.ui.actionExport.triggered.connect(self._export_current_view)
         self.ui.actionCrop.triggered.connect(self._crop_current_view)
@@ -113,7 +102,6 @@ class MainWindow(QMainWindow):
         display_markers: bool = False,
         parent: QTreeWidgetItem = None,
     ) -> ViewController:
-
         controller = ViewController(
             name,
             df,
@@ -131,19 +119,14 @@ class MainWindow(QMainWindow):
         else:
             self.ui.treeWidget.addTopLevelItem(tree_item)
 
-        for series in controller.chart.series():
-            series_item = QTreeWidgetItem(tree_item)
-            series_item.setText(0, series.name())
-            series_item.setCheckState(0, Qt.Checked)
-            series_item.series = series
-
         if len(controller.chart.series()) > 1:
             tree_item.setExpanded(True)
         else:
             controller.chart.legend().setVisible(False)
 
         self.ui.stackedWidget.addWidget(controller.chart_view)
-        self._open_views[tree_item] = controller
+        self.ui.treeWidget.add_view(controller)
+        # self._open_views[tree_item] = controller
 
         self.ui.treeWidget.setCurrentItem(tree_item)
 
@@ -195,34 +178,30 @@ class MainWindow(QMainWindow):
         files = self._get_supported_files(event)
         if files:
             event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
-        event.acceptProposedAction()
+        # event.acceptProposedAction()
+        super().dragMoveEvent(event)
 
     def dropEvent(self, event: QDropEvent) -> None:
         files = self._get_supported_files(event)
         if files:
             event.acceptProposedAction()
             QTimer.singleShot(1, lambda: self._add_files(files))
+        else:
+            super().dropEvent(event)
 
     def _close_current_view(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.remove_current_view()
         if controller:
-            item = controller.tree_item
-            next_item = self.ui.treeWidget.itemAbove(item)
-            next_item = self._get_root_parent(next_item)
-            self.ui.treeWidget.invisibleRootItem().removeChild(item)
-
-            if self.ui.treeWidget.currentItem() is None:
-                self.ui.treeWidget.setCurrentItem(next_item)
-
-            self._open_views.pop(item)
             self.ui.stackedWidget.removeWidget(controller.chart_view)
 
     def _export_current_view(self) -> None:
-        item = self.ui.treeWidget.currentItem()
-        controller = self._get_controller_from_tree_item(item)
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
+            item = controller.item
             suggested_name = item.text(0).split(".")[0]
             fileName, _ = QFileDialog.getSaveFileName(
                 self, "Export File", suggested_name, "CSV (*.csv)"
@@ -231,17 +210,17 @@ class MainWindow(QMainWindow):
                 controller.df.to_csv(fileName)
 
     def _crop_current_view(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             controller.crop()
 
     def _fit_to_contents(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             controller.fit_contents()
 
     def _fft_current_view(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
@@ -263,7 +242,7 @@ class MainWindow(QMainWindow):
                 )
 
     def _srs_current_view(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
@@ -292,14 +271,14 @@ class MainWindow(QMainWindow):
                 )
 
     def _update_markers(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             controller.display_markers = self.ui.marker_group.isChecked()
             controller.marker_size = self.ui.markerSize_spin.value()
             controller.marker_count = self.ui.markerCount_spin.value()
 
     def _update_chart_ranges(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             controller.setAxisRanges(
                 self.ui.xMin_spin.value(),
@@ -309,7 +288,7 @@ class MainWindow(QMainWindow):
             )
 
     def _update_tick_counts(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             controller.x_axis.setMinorTickCount(self.ui.xMinorTicks_spin.value())
             controller.x_axis.setTickCount(self.ui.xMajorTicks_spin.value())
@@ -323,7 +302,7 @@ class MainWindow(QMainWindow):
             spin_box.blockSignals(blocked)
 
     def _update_chart_settings(self) -> None:
-        controller = self._get_current_controller()
+        controller = self.ui.treeWidget.get_current_controller()
         if controller:
             x_axis = controller.x_axis
             y_axis = controller.y_axis
@@ -347,16 +326,17 @@ class MainWindow(QMainWindow):
     ) -> None:
 
         if previous:
-            controller = self._get_controller_from_tree_item(previous)
-            x_axis = controller.x_axis
-            y_axis = controller.y_axis
-            x_axis.disconnect(self)
-            y_axis.disconnect(self)
+            controller = self.ui.treeWidget.get_controller(previous)
+            if controller:
+                x_axis = controller.x_axis
+                y_axis = controller.y_axis
+                x_axis.disconnect(self)
+                y_axis.disconnect(self)
 
         self.ui.chartSettingsDockWidget.setEnabled((current != None))
 
         index_type = None
-        controller = self._get_controller_from_tree_item(current)
+        controller = self.ui.treeWidget.get_controller(current)
         if controller:
             self._update_chart_settings()
             x_axis = controller.x_axis
@@ -375,6 +355,7 @@ class MainWindow(QMainWindow):
 
             index_type = controller.df.index.inferred_type
 
+        self.ui.actionFit_Contents.setEnabled(controller is not None)
         self.ui.actionClose.setEnabled(controller is not None)
         self.ui.actionExport.setEnabled(controller is not None)
         self.ui.actionCrop.setEnabled(controller is not None)
@@ -382,21 +363,10 @@ class MainWindow(QMainWindow):
         self.ui.actionSRS.setEnabled(index_type == "timedelta64")
 
     def _tree_item_changed(self, item: QTreeWidgetItem, column: int):
-        if column == 0 and hasattr(item, "series"):
-            item.series.setVisible(item.checkState(0) == Qt.Checked)
-
-    def _get_root_parent(self, item):
-        while item and item.parent() is not None:
-            item = item.parent()
-        return item
-
-    def _get_controller_from_tree_item(self, item: QTreeWidgetItem) -> ViewController:
-        if item not in self._open_views:
-            item = self._get_root_parent(item)
-
-        if item:
-            return self._open_views.get(item)
-        return None
-
-    def _get_current_controller(self) -> ViewController:
-        return self._get_controller_from_tree_item(self.ui.treeWidget.currentItem())
+        if column == 0:
+            controller = self.ui.treeWidget.get_controller(item)
+            if controller and controller.tree_item is not item:
+                if item in controller:
+                    controller[item].chart_series.setVisible(
+                        item.checkState(0) == Qt.Checked
+                    )

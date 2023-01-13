@@ -41,7 +41,7 @@
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
-      <widget class="QTreeWidget" name="treeWidget">
+      <widget class="ViewsTreeWidget" name="treeWidget">
        <column>
         <property name="text">
          <string>Name</string>
@@ -72,6 +72,9 @@
    </widget>
   </widget>
   <widget class="QToolBar" name="toolBar">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="windowTitle">
     <string>toolBar</string>
    </property>
@@ -85,6 +88,7 @@
    <addaction name="actionClose"/>
    <addaction name="actionExport"/>
    <addaction name="separator"/>
+   <addaction name="actionFit_Contents"/>
    <addaction name="actionCrop"/>
    <addaction name="actionFFT"/>
    <addaction name="actionSRS"/>
@@ -274,13 +278,6 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="fitToContents_button">
-       <property name="text">
-        <string>Fit to Contents</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
@@ -354,6 +351,9 @@
    </property>
   </action>
   <action name="actionFFT">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="icon">
     <iconset resource="../resources.qrc">
      <normaloff>:/icons/fft.png</normaloff>:/icons/fft.png</iconset>
@@ -366,6 +366,9 @@
    </property>
   </action>
   <action name="actionSRS">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="icon">
     <iconset resource="../resources.qrc">
      <normaloff>:/icons/srs.png</normaloff>:/icons/srs.png</iconset>
@@ -377,7 +380,29 @@
     <string>Run SRS on current view</string>
    </property>
   </action>
+  <action name="actionFit_Contents">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/fit.png</normaloff>:/icons/fit.png</iconset>
+   </property>
+   <property name="text">
+    <string>Fit Contents</string>
+   </property>
+   <property name="toolTip">
+    <string>Fit data within view</string>
+   </property>
+  </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ViewsTreeWidget</class>
+   <extends>QTreeWidget</extends>
+   <header>app.widgets.viewstreewidget</header>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>treeWidget</tabstop>
   <tabstop>undoView</tabstop>
