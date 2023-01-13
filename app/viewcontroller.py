@@ -268,7 +268,7 @@ class ViewController(QObject):
                 i += 1
 
             if old_name != col:
-                df.rename(columns={old_name: col}, inplace=True)
+                df = df.rename(columns={old_name: col})
 
         if points is None:
             points = df_to_points(df)
@@ -278,12 +278,13 @@ class ViewController(QObject):
 
     def _add_data(self, df: pd.DataFrame, points: Dict[str, List[QPointF]]):
         self._df = pd.concat([self._df, df], axis="columns")
+        self._df = self._df.sort_index()
         for name, data in points.items():
             series = self._add_series(name)
             series.points = data
 
     def _remove_data(self, df: pd.DataFrame) -> None:
-        self._df.drop(df.columns, axis="columns", inplace=True)
+        self._df = self._df.drop(df.columns, axis="columns")
         for col in df:
             self._remove_series(col)
 
@@ -343,7 +344,7 @@ class ViewController(QObject):
         if view_series is None or view_series.name not in self._df:
             raise ValueError(f"Series not in {self.name}")
 
-        self._df.rename(columns={view_series.name: name}, inplace=True)
+        self._df = self._df.rename(columns={view_series.name: name})
         view_series.name = name
 
     def _point_hovered(self, pos: QPointF, state: bool):
