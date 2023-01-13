@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QSpinBox,
     QTreeWidgetItem,
+    QColorDialog,
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
@@ -18,7 +19,7 @@ from app.plugins.options import NumericOption
 from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import timing
-from app.viewcontroller import ViewController
+from app.viewcontroller import ViewController, ViewSeries
 from app.widgets.optionsdialog import OptionsDialog
 from app.widgets.parserdialog import ParserDialog
 
@@ -72,15 +73,35 @@ class MainWindow(QMainWindow):
         self.ui.actionFFT.triggered.connect(self._fft_current_view)
         self.ui.actionSRS.triggered.connect(self._srs_current_view)
 
+        self.ui.saveDefaults_button.clicked.connect(self._save_chart_settings)
+
     def _load_settings(self) -> None:
         settings = QSettings()
         self.restoreGeometry(settings.value("geometry"))
         self.restoreState(settings.value("state"))
 
+        self._marker_size = settings.value("marker_size", 10)
+        self._marker_count = settings.value("marker_count", 5)
+
+        self._x_minor_ticks = settings.value("x_minor_ticks", 0)
+        self._x_major_ticks = settings.value("x_major_ticks", 5)
+
+        self._y_minor_ticks = settings.value("y_minor_ticks", 0)
+        self._y_major_ticks = settings.value("y_major_ticks", 5)
+
     def _save_settings(self) -> None:
         settings = QSettings()
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("state", self.saveState())
+
+    def _save_chart_settings(self):
+        settings = QSettings()
+        settings.setValue("marker_size", self.ui.markerSize_spin.value())
+        settings.setValue("marker_count", self.ui.markerCount_spin.value())
+        settings.setValue("x_minor_ticks", self.ui.xMinorTicks_spin.value())
+        settings.setValue("x_major_ticks", self.ui.xMajorTicks_spin.value())
+        settings.setValue("y_minor_ticks", self.ui.yMinorTicks_spin.value())
+        settings.setValue("y_major_ticks", self.ui.yMajorTicks_spin.value())
 
     def _load_plugins(self) -> None:
         pm: PluginManager = PluginManagerSingleton.get()
@@ -100,12 +121,12 @@ class MainWindow(QMainWindow):
         x_title: str,
         y_title: str,
         display_markers: bool = False,
-        parent: QTreeWidgetItem = None,
     ) -> ViewController:
         controller = ViewController(
             name,
             df,
             display_markers=display_markers,
+            tree_widget=self.ui.treeWidget,
             parent=self,
         )
         controller.x_axis.setTitleText(x_title)
@@ -113,11 +134,6 @@ class MainWindow(QMainWindow):
 
         tree_item = controller.tree_item
         tree_item.setFlags(tree_item.flags() | Qt.ItemIsAutoTristate)
-
-        if parent:
-            parent.addChild(tree_item)
-        else:
-            self.ui.treeWidget.addTopLevelItem(tree_item)
 
         if len(controller.chart.series()) > 1:
             tree_item.setExpanded(True)
@@ -129,6 +145,19 @@ class MainWindow(QMainWindow):
         # self._open_views[tree_item] = controller
 
         self.ui.treeWidget.setCurrentItem(tree_item)
+
+        self.ui.treeWidget.resizeColumnToContents(0)
+        self.ui.treeWidget.resizeColumnToContents(1)
+
+        controller.marker_count = self._marker_count
+        controller.marker_size = self._marker_size
+
+        controller.x_axis.setTickCount(self._x_major_ticks)
+        controller.x_axis.setMinorTickCount(self._x_minor_ticks)
+        controller.y_axis.setTickCount(self._y_major_ticks)
+        controller.y_axis.setMinorTickCount(self._y_minor_ticks)
+
+        controller.legend_clicked.connect(self._series_legend_clicked)
 
         return controller
 
@@ -197,6 +226,7 @@ class MainWindow(QMainWindow):
         controller = self.ui.treeWidget.remove_current_view()
         if controller:
             self.ui.stackedWidget.removeWidget(controller.chart_view)
+            controller.deleteLater()
 
     def _export_current_view(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -370,3 +400,8 @@ class MainWindow(QMainWindow):
                     controller[item].chart_series.setVisible(
                         item.checkState(0) == Qt.Checked
                     )
+
+    def _series_legend_clicked(self, series: ViewSeries):
+        color = QColorDialog.getColor(series.color, self)
+        if color.isValid():
+            series.color = color

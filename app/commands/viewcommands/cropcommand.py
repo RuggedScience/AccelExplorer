@@ -33,12 +33,11 @@ class CropCommand(QUndoCommand):
 
     def _update_view(self, df, points):
         self._controller._df = df
-        for series in self._controller.chart.series():
-            if isinstance(series, QLineSeries):
-                name = series.name()
-                p = points.get(name)
-                if p is not None:
-                    self._controller._update_series_points(series, p)
+        for series in self._controller:
+            name = series.name
+            p = points.get(name)
+            if p is not None:
+                series.points = p
         self._controller._axis_range_changed()
 
     def undo(self) -> None:

@@ -4,22 +4,40 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from PySide6.QtCharts import QChart, QLineSeries, QValueAxis
-from PySide6.QtCore import QObject, QPointF, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QUndoStack, QImage
-from PySide6.QtWidgets import QTreeWidgetItem
+from PySide6.QtCore import QObject, QPointF, Qt, QTimer, Signal
+from PySide6.QtGui import QKeySequence, QUndoStack, QImage, QColor
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
 from app.commands.viewcommands import CropCommand, DataCommand, AddDataCommand
 from app.utils import df_to_points
 from app.utils.markergenerator import MarkerGenerator
 from app.widgets.interactivechart import InteractiveChart
+from app.widgets.colorwidget import ColorWidget
 
 AxisRanges = namedtuple("AxisRanges", ["x_min", "x_max", "y_min", "y_max"])
 
 
-class ViewSeries:
-    def __init__(self, name: str, parent: QTreeWidgetItem = None) -> None:
+class ViewSeries(QObject):
+    legend_clicked = Signal()
+
+    def __init__(
+        self,
+        name: str,
+        parent_item: QTreeWidgetItem = None,
+        parent: QObject = None,
+    ) -> None:
+        super().__init__(parent)
         self._chart_series = QLineSeries()
-        self._tree_item = QTreeWidgetItem(parent)
+        self._chart_series.colorChanged.connect(self._color_changed)
+
+        self._tree_item = QTreeWidgetItem(parent_item)
+        if self._tree_item.treeWidget():
+            self._color_widget = ColorWidget(QColor())
+            self._color_widget.clicked.connect(self.legend_clicked)
+            self._tree_item.treeWidget().setItemWidget(
+                self._tree_item, 1, self._color_widget
+            )
+
         self.name = name
 
     @property
@@ -40,13 +58,45 @@ class ViewSeries:
     def tree_item(self) -> QTreeWidgetItem:
         return self._tree_item
 
+    @property
+    def points(self) -> List[QPointF]:
+        return self._chart_series.points()
+
+    @points.setter
+    def points(self, points: List[QPointF]) -> None:
+        self.chart_series.replace(points)
+        # Only use OpenGL with large datasets
+        use_opengl = len(points) > 100000
+        # Bug when disabling opengl causes the "old"
+        # series data to still be drawn on top of
+        # the new series data. Hide and show fixes this.
+        if not use_opengl and self._chart_series.useOpenGL():
+            self._chart_series.hide()
+            QTimer.singleShot(10, self._chart_series.show)
+
+        self._chart_series.setUseOpenGL(use_opengl)
+
+    @property
+    def color(self) -> QColor:
+        return self._chart_series.color()
+
+    @color.setter
+    def color(self, color: QColor) -> None:
+        self._chart_series.setColor(color)
+
+    def _color_changed(self, color: QColor):
+        self._color_widget.color = color
+
 
 class ViewController(QObject):
+    legend_clicked = Signal(ViewSeries)
+
     def __init__(
         self,
         name: str,
         df: pd.DataFrame,
         display_markers: bool = False,
+        tree_widget: QTreeWidget = None,
         parent: QObject = None,
     ):
         super().__init__(parent)
@@ -58,9 +108,10 @@ class ViewController(QObject):
         self._display_markers = display_markers
         self._marker_generator = MarkerGenerator(50)
 
-        self._tree_item = QTreeWidgetItem()
+        self._tree_item = QTreeWidgetItem(tree_widget)
         self._undo_stack = QUndoStack(self)
         self._chart_view = InteractiveChart()
+        self._chart_view.chart().legend().hide()
 
         self._x_axis = QValueAxis()
         self._y_axis = QValueAxis()
@@ -149,15 +200,6 @@ class ViewController(QObject):
         return self._undo_stack
 
     @property
-    def axis_ranges(self) -> AxisRanges:
-        return AxisRanges(
-            self._x_axis.min(),
-            self._x_axis.max(),
-            self._y_axis.min(),
-            self._y_axis.max(),
-        )
-
-    @property
     def display_markers(self) -> bool:
         return self._display_markers
 
@@ -179,9 +221,10 @@ class ViewController(QObject):
     @marker_size.setter
     def marker_size(self, size: int) -> None:
         if self._marker_size != size:
-            for series in self._view_series.values():
-                series.chart_series.setMarkerSize(size)
             self._marker_size = size
+            if self._display_markers:
+                for series in self._view_series.values():
+                    series.chart_series.setMarkerSize(size)
 
     @property
     def marker_count(self) -> int:
@@ -191,7 +234,18 @@ class ViewController(QObject):
     def marker_count(self, count: int) -> None:
         if self._marker_count != count:
             self._marker_count = count
-            self._update_marker_points()
+            if self._display_markers:
+                self._update_marker_points()
+
+    def setAxisRanges(
+        self,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+    ) -> None:
+        self._x_axis.setRange(x_min, x_max)
+        self._y_axis.setRange(y_min, y_max)
 
     def set_df(self, df: pd.DataFrame, title: str) -> None:
         cmd = DataCommand(title, self, self._df, df)
@@ -226,7 +280,7 @@ class ViewController(QObject):
         self._df = pd.concat([self._df, df], axis="columns")
         for name, data in points.items():
             series = self._add_series(name)
-            series.chart_series.replace(data)
+            series.points = data
 
     def _remove_data(self, df: pd.DataFrame) -> None:
         self._df.drop(df.columns, axis="columns", inplace=True)
@@ -304,7 +358,8 @@ class ViewController(QObject):
             self.chart_view.tooltip.hide()
 
     def _add_series(self, name: str) -> ViewSeries:
-        view_series = ViewSeries(name, self._tree_item)
+        view_series = ViewSeries(name, self._tree_item, self)
+        view_series.legend_clicked.connect(self._legend_clicked)
 
         chart_series = view_series.chart_series
         self.chart.addSeries(chart_series)
@@ -352,26 +407,6 @@ class ViewController(QObject):
         for name in added_cols:
             self._add_series(name)
 
-    def _update_series_points(
-        self,
-        series: QLineSeries | ViewSeries,
-        points: List[QPointF],
-    ) -> None:
-        if isinstance(series, ViewSeries):
-            series = series.chart_series
-
-        series.replace(points)
-        # Only use OpenGL with large datasets
-        use_opengl = len(points) > 100000
-        # Bug when disabling opengl causes the "old"
-        # series data to still be drawn on top of
-        # the new series data. Hide and show fixes this.
-        if not use_opengl and series.useOpenGL():
-            series.hide()
-            QTimer.singleShot(10, series.show)
-
-        series.setUseOpenGL(use_opengl)
-
     def _replace_data(self, df: pd.DataFrame) -> None:
         self._df = df
         self._update_series()
@@ -380,7 +415,7 @@ class ViewController(QObject):
         for view_series in self._view_series.values():
             points = all_points.get(view_series.name)
             if points is not None:
-                self._update_series_points(view_series.chart_series, points)
+                view_series.points = points
 
     def _update_series_markers(self, series: QLineSeries) -> None:
         if not self._display_markers:
@@ -391,12 +426,9 @@ class ViewController(QObject):
             series.setMarkerSize(self._marker_size)
             series.setSelectedLightMarker(self._marker_generator.next(series.color()))
 
-    def _update_marker_points(self, start: float = None, end: float = None) -> None:
-        if start is None:
-            start = self._x_axis.min()
-
-        if end is None:
-            end = self._x_axis.max()
+    def _update_marker_points(self) -> None:
+        start = self._x_axis.min()
+        end = self._x_axis.max()
 
         # Create linearly spaced points even with the axis tick counts
         indices = np.linspace(start, end, self._marker_count)
@@ -411,23 +443,14 @@ class ViewController(QObject):
             series.chart_series.deselectAllPoints()
             series.chart_series.selectPoints(points)
 
-    def setAxisRanges(
-        self,
-        x_min: float,
-        x_max: float,
-        y_min: float,
-        y_max: float,
-    ) -> None:
-        self._x_axis.setRange(x_min, x_max)
-        self._y_axis.setRange(y_min, y_max)
-
     def _axis_range_changed(self) -> None:
-        ranges = self.axis_ranges
-
         if self._display_markers:
-            self._update_marker_points(ranges.x_min, ranges.x_max)
+            self._update_marker_points()
 
     def _get_series_from_name(self, name: str) -> ViewSeries:
         for s in self._view_series.values():
             if s.name == name:
                 return s
+
+    def _legend_clicked(self) -> None:
+        self.legend_clicked.emit(self.sender())

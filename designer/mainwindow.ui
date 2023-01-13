@@ -47,6 +47,11 @@
          <string>Name</string>
         </property>
        </column>
+       <column>
+        <property name="text">
+         <string>Color</string>
+        </property>
+       </column>
       </widget>
      </item>
     </layout>
@@ -278,9 +283,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="saveDefaults_button">
+       <property name="text">
+        <string>Save Defaults</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Expanding</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
