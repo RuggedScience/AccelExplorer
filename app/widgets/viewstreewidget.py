@@ -1,6 +1,6 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent
 
@@ -8,11 +8,18 @@ from app.viewcontroller import ViewController
 
 
 class ViewsTreeWidget(QTreeWidget):
+    currentViewChanged = Signal(ViewController, ViewController)
+    selectionChanged = Signal(list)
+
     def __init__(self, parent: Optional[QWidget] = ...) -> None:
         super().__init__(parent)
 
+        self.currentItemChanged.connect(self._current_item_changed)
+        self.itemSelectionChanged.connect(self._selection_changed)
+
         self.setDragDropMode(QTreeWidget.DragDropMode.DragDrop)
         self.setEditTriggers(QTreeWidget.EditTrigger.DoubleClicked)
+        self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.itemChanged.connect(self._item_changed)
 
         self._drag_controller = None
@@ -107,6 +114,19 @@ class ViewsTreeWidget(QTreeWidget):
                     controller.name = item.text(0)
                 elif item in controller:
                     controller.rename_series(item, item.text(0))
+                    controller[item].chart_series.setVisible(
+                        item.checkState(0) == Qt.Checked
+                    )
+
+    def _current_item_changed(
+        self, current: QTreeWidgetItem, previous: QTreeWidgetItem
+    ) -> None:
+        new = self.get_controller(current)
+        old = self.get_controller(previous)
+        self.currentViewChanged.emit(new, old)
+
+    def _selection_changed(self) -> None:
+        self.selectionChanged.emit(self.get_selected_controllers())
 
     def _get_root_parent(self, item):
         while item and item.parent() is not None:
@@ -123,3 +143,10 @@ class ViewsTreeWidget(QTreeWidget):
 
     def get_current_controller(self) -> ViewController:
         return self.get_controller(self.currentItem())
+
+    def get_selected_controllers(self) -> List[ViewController]:
+        controllers = []
+        for item in self.selectedItems():
+            controllers.append(self.get_controller(item))
+
+        return list(set(controllers))

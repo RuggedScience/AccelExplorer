@@ -43,12 +43,12 @@ class MainWindow(QMainWindow):
         for parser in self._parsers:
             exts += [ext.lower() for ext in parser.supported_extensions()]
 
-        return exts
+        return list(set(exts))
 
     def _connect_signals(self) -> None:
         # Views tree widget
-        self.ui.treeWidget.currentItemChanged.connect(self._current_tree_item_changed)
-        self.ui.treeWidget.itemChanged.connect(self._tree_item_changed)
+        self.ui.treeWidget.currentViewChanged.connect(self._current_view_changed)
+        self.ui.treeWidget.selectionChanged.connect(self._selection_changed)
         # Chart X-Axis Ranges
         self.ui.xMin_spin.valueChanged.connect(self._update_chart_ranges)
         self.ui.xMax_spin.valueChanged.connect(self._update_chart_ranges)
@@ -66,12 +66,13 @@ class MainWindow(QMainWindow):
         self.ui.markerSize_spin.valueChanged.connect(self._update_markers)
         self.ui.markerCount_spin.valueChanged.connect(self._update_markers)
         # Actions
+        self.ui.actionOpen.triggered.connect(self._open_files)
         self.ui.actionFit_Contents.triggered.connect(self._fit_to_contents)
         self.ui.actionClose.triggered.connect(self._close_current_view)
         self.ui.actionExport.triggered.connect(self._export_current_view)
         self.ui.actionCrop.triggered.connect(self._crop_current_view)
         self.ui.actionFFT.triggered.connect(self._fft_current_view)
-        self.ui.actionSRS.triggered.connect(self._srs_current_view)
+        self.ui.actionSRS.triggered.connect(self._srs_current_selection)
 
         self.ui.saveDefaults_button.clicked.connect(self._save_chart_settings)
 
@@ -250,8 +251,8 @@ class MainWindow(QMainWindow):
             controller.fit_contents()
 
     def _fft_current_view(self) -> None:
-        controller = self.ui.treeWidget.get_current_controller()
-        if controller:
+        controllers = self.ui.treeWidget.get_selected_controllers()
+        if controllers:
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
@@ -262,18 +263,19 @@ class MainWindow(QMainWindow):
                 min_x = values.get("min_freq", 10)
                 max_x = values.get("max_freq", 1000)
 
-                fft: pd.DataFrame = ed.calc.fft.fft(controller.df)
-                fft = fft[(fft.index >= min_x) & (fft.index <= max_x)]
-                self._add_view(
-                    f"FFT - {controller.name}",
-                    fft,
-                    "Frequency (Hz)",
-                    "Magnitude",
-                )
+                for controller in controllers:
+                    fft: pd.DataFrame = ed.calc.fft.fft(controller.df)
+                    fft = fft[(fft.index >= min_x) & (fft.index <= max_x)]
+                    self._add_view(
+                        f"FFT - {controller.name}",
+                        fft,
+                        "Frequency (Hz)",
+                        "Magnitude",
+                    )
 
-    def _srs_current_view(self) -> None:
-        controller = self.ui.treeWidget.get_current_controller()
-        if controller:
+    def _srs_current_selection(self) -> None:
+        controllers = self.ui.treeWidget.get_selected_controllers()
+        if controllers:
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
@@ -285,20 +287,22 @@ class MainWindow(QMainWindow):
                 min_x = values.get("min_freq", 10)
                 max_x = values.get("max_freq", 1000)
                 dampening = values.get("dampening", 5) / 100
-                srs: pd.DataFrame = ed.calc.shock.shock_spectrum(
-                    controller.df,
-                    damp=dampening,
-                    init_freq=min_x,
-                    mode="srs",
-                )
+                for controller in controllers:
+                    srs: pd.DataFrame = ed.calc.shock.shock_spectrum(
+                        controller.df,
+                        damp=dampening,
+                        init_freq=min_x,
+                        mode="srs",
+                    )
 
-                srs = srs[srs.index <= max_x]
-                self._add_view(
-                    f"FFT - {controller.name}",
-                    srs,
-                    "Frequency (Hz)",
-                    "Magnitude",
-                )
+                    srs = srs[srs.index <= max_x]
+                    self._add_view(
+                        f"FFT - {controller.name}",
+                        srs,
+                        "Frequency (Hz)",
+                        "Magnitude",
+                        display_markers=True,
+                    )
 
     def _update_markers(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -351,26 +355,24 @@ class MainWindow(QMainWindow):
             self._set_value_silent(self.ui.markerCount_spin, controller.marker_count)
             self.ui.marker_group.setChecked(controller.display_markers)
 
-    def _current_tree_item_changed(
-        self, current: QTreeWidgetItem, previous: QTreeWidgetItem = None
+    def _current_view_changed(
+        self,
+        current: ViewController,
+        previous: ViewController = None,
     ) -> None:
 
         if previous:
-            controller = self.ui.treeWidget.get_controller(previous)
-            if controller:
-                x_axis = controller.x_axis
-                y_axis = controller.y_axis
-                x_axis.disconnect(self)
-                y_axis.disconnect(self)
+            x_axis = previous.x_axis
+            y_axis = previous.y_axis
+            x_axis.disconnect(self)
+            y_axis.disconnect(self)
 
         self.ui.chartSettingsDockWidget.setEnabled((current != None))
 
-        index_type = None
-        controller = self.ui.treeWidget.get_controller(current)
-        if controller:
+        if current:
             self._update_chart_settings()
-            x_axis = controller.x_axis
-            y_axis = controller.y_axis
+            x_axis = current.x_axis
+            y_axis = current.y_axis
 
             x_axis.rangeChanged.connect(self._update_chart_settings)
             x_axis.tickCountChanged.connect(self._update_chart_settings)
@@ -380,28 +382,36 @@ class MainWindow(QMainWindow):
             y_axis.tickCountChanged.connect(self._update_chart_settings)
             y_axis.minorTickCountChanged.connect(self._update_chart_settings)
 
-            self.ui.stackedWidget.setCurrentWidget(controller.chart_view)
-            self.ui.undoView.setStack(controller.undo_stack)
+            self.ui.stackedWidget.setCurrentWidget(current.chart_view)
+            self.ui.undoView.setStack(current.undo_stack)
 
-            index_type = controller.df.index.inferred_type
+        enable = current is not None
+        self.ui.actionFit_Contents.setEnabled(enable)
+        self.ui.actionClose.setEnabled(enable)
+        self.ui.actionExport.setEnabled(enable)
+        self.ui.actionCrop.setEnabled(enable)
 
-        self.ui.actionFit_Contents.setEnabled(controller is not None)
-        self.ui.actionClose.setEnabled(controller is not None)
-        self.ui.actionExport.setEnabled(controller is not None)
-        self.ui.actionCrop.setEnabled(controller is not None)
-        self.ui.actionFFT.setEnabled(index_type == "timedelta64")
-        self.ui.actionSRS.setEnabled(index_type == "timedelta64")
+    def _selection_changed(self, controllers: List[ViewController]) -> None:
+        enable = True
+        for controller in controllers:
+            if controller.df.index.inferred_type != "timedelta64":
+                enable = False
+                break
 
-    def _tree_item_changed(self, item: QTreeWidgetItem, column: int):
-        if column == 0:
-            controller = self.ui.treeWidget.get_controller(item)
-            if controller and controller.tree_item is not item:
-                if item in controller:
-                    controller[item].chart_series.setVisible(
-                        item.checkState(0) == Qt.Checked
-                    )
+        self.ui.actionFFT.setEnabled(enable)
+        self.ui.actionSRS.setEnabled(enable)
 
     def _series_legend_clicked(self, series: ViewSeries):
         color = QColorDialog.getColor(series.color, self)
         if color.isValid():
             series.color = color
+
+    def _open_files(self) -> None:
+        filters = "Data files ("
+        for ext in self.supported_extensions:
+            filters += f"*.{ext} "
+        filters = filters.strip() + ")"
+
+        files, _ = QFileDialog.getOpenFileNames(self, "Select Files", "", filters)
+        if files:
+            self._add_files([QFileInfo(filename) for filename in files])
