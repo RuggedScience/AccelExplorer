@@ -381,7 +381,7 @@ class ViewController(QObject):
         chart_series.clicked.connect(self.chart_view.keep_tooltip)
 
         tree_item = view_series.tree_item
-        tree_item.setFlags(tree_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+        # tree_item.setFlags(tree_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
         tree_item.setCheckState(0, Qt.Checked)
 
         self._view_series[tree_item] = view_series
