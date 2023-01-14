@@ -33,20 +33,21 @@ class ViewsTreeWidget(QTreeWidget):
         self._controllers[controller.tree_item] = controller
 
     def remove_view(self, controller: ViewController) -> None:
-        self._controllers.pop(controller.tree_item)
+        item = controller.tree_item
+        self._controllers.pop(item)
+        self.invisibleRootItem().removeChild(item)
 
     def remove_current_view(self) -> ViewController:
         controller = self.get_current_controller()
         if controller:
+            self.remove_view(controller)
             item = controller.tree_item
             next_item = self.itemAbove(item)
             next_item = self._get_root_parent(next_item)
-            self.invisibleRootItem().removeChild(item)
 
             if self.currentItem() is None:
                 self.setCurrentItem(next_item)
 
-            self._controllers.pop(item)
         return controller
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
