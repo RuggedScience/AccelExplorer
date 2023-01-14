@@ -23,3 +23,8 @@ ListOptionPair = namedtuple("ListOptionPair", ["name", "value"])
 class ListOption(DataOption):
 
     options: List[ListOptionPair]
+
+
+@dataclass
+class BoolOption(DataOption):
+    checked: bool

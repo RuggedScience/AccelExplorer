@@ -1,10 +1,15 @@
 from typing import Any, Callable, Dict
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QFormLayout,
-                               QSpinBox, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QSpinBox,
+    QWidget,
+    QCheckBox,
+)
 
-from app.plugins.options import DataOption, ListOption, NumericOption
+from app.plugins.options import DataOption, ListOption, NumericOption, BoolOption
 
 
 class OptionsUiManager:
@@ -66,6 +71,9 @@ class OptionsUiManager:
                 widget.addItems([i.name for i in v.options])
                 if self._callback:
                     widget.currentTextChanged.connect(self._callback)
+            elif isinstance(v, BoolOption):
+                widget = QCheckBox()
+                widget.setChecked(v.checked)
 
             self._layout.addRow(v.name, widget)
             self._widgets[k] = widget
@@ -83,6 +91,8 @@ class OptionsUiManager:
                 for option in options:
                     if option.name == text:
                         value = option.value
+            elif isinstance(widget, QCheckBox):
+                value = widget.isChecked()
 
             if value is not None:
                 values[k] = value
