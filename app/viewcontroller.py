@@ -300,7 +300,11 @@ class ViewController(QObject):
             x_max = pd.to_timedelta(x_max, unit="S")
 
         new_df = self._df[(self._df.index >= x_min) & (self._df.index <= x_max)]
-        # Reset index to 0
+
+        # If the data is time data, reset the index so
+        # the data starts at 0.00 seconds. Helps when
+        # dragging and dropping new series.
+        if new_df.index.inferred_type == "timedelta64":
         series = new_df.index.to_series()
         new_df.index = series - series[0]
 
