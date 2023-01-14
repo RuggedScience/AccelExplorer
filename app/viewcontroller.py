@@ -300,8 +300,11 @@ class ViewController(QObject):
             x_max = pd.to_timedelta(x_max, unit="S")
 
         new_df = self._df[(self._df.index >= x_min) & (self._df.index <= x_max)]
+        # Reset index to 0
+        series = new_df.index.to_series()
+        new_df.index = series - series[0]
 
-        old_points = {series.name(): series.points() for series in self.chart.series()}
+        old_points = {series.name: series.points for series in self}
         new_points = df_to_points(new_df)
 
         cmd = CropCommand(self, self._df, new_df, old_points, new_points)

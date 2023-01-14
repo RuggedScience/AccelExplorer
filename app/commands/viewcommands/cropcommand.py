@@ -39,6 +39,7 @@ class CropCommand(QUndoCommand):
             if p is not None:
                 series.points = p
         self._controller._axis_range_changed()
+        self._controller.fit_contents()
 
     def undo(self) -> None:
         self._update_view(self._old_df, self._old_points)
