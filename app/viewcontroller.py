@@ -305,8 +305,8 @@ class ViewController(QObject):
         # the data starts at 0.00 seconds. Helps when
         # dragging and dropping new series.
         if new_df.index.inferred_type == "timedelta64":
-        series = new_df.index.to_series()
-        new_df.index = series - series[0]
+            series = new_df.index.to_series()
+            new_df.index = series - series[0]
 
         old_points = {series.name: series.points for series in self}
         new_points = df_to_points(new_df)
