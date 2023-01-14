@@ -84,6 +84,16 @@ class ViewSeries(QObject):
     def color(self, color: QColor) -> None:
         self._chart_series.setColor(color)
 
+    @property
+    def width(self) -> int:
+        return self._chart_series.pen().width()
+
+    @width.setter
+    def width(self, width: int) -> None:
+        pen = self._chart_series.pen()
+        pen.setWidth(width)
+        self._chart_series.setPen(pen)
+
     def _color_changed(self, color: QColor):
         self._color_widget.color = color
 
@@ -103,6 +113,7 @@ class ViewController(QObject):
 
         self._view_series: Dict[QTreeWidgetItem, ViewSeries] = {}
 
+        self._series_width = 1
         self._marker_size = 10
         self._marker_count = 5
         self._display_markers = display_markers
@@ -198,6 +209,16 @@ class ViewController(QObject):
     @property
     def undo_stack(self) -> None:
         return self._undo_stack
+
+    @property
+    def series_width(self) -> int:
+        return self._series_width
+
+    @series_width.setter
+    def series_width(self, width: int) -> None:
+        self._series_width = width
+        for series in self:
+            series.width = width
 
     @property
     def display_markers(self) -> bool:
@@ -384,6 +405,7 @@ class ViewController(QObject):
         # tree_item.setFlags(tree_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
         tree_item.setCheckState(0, Qt.Checked)
 
+        view_series.width = self._series_width
         self._view_series[tree_item] = view_series
 
         self._update_series_markers(chart_series)

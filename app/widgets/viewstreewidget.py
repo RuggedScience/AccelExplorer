@@ -1,6 +1,6 @@
 from typing import Optional, Dict, List
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QItemSelection
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent
 

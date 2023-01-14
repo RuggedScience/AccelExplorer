@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
     QSpinBox,
-    QTreeWidgetItem,
     QColorDialog,
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
@@ -61,6 +60,8 @@ class MainWindow(QMainWindow):
         # Chart Y-Axis Tick Marks
         self.ui.yMinorTicks_spin.valueChanged.connect(self._update_tick_counts)
         self.ui.yMajorTicks_spin.valueChanged.connect(self._update_tick_counts)
+        # Series Group
+        self.ui.seriesWidth_spin.valueChanged.connect(self._update_series_width)
         # Markers
         self.ui.marker_group.clicked.connect(self._update_markers)
         self.ui.markerSize_spin.valueChanged.connect(self._update_markers)
@@ -89,6 +90,7 @@ class MainWindow(QMainWindow):
 
         self._y_minor_ticks = settings.value("y_minor_ticks", 0)
         self._y_major_ticks = settings.value("y_major_ticks", 5)
+        self._series_width = settings.value("series_width", 2)
 
     def _save_settings(self) -> None:
         settings = QSettings()
@@ -103,6 +105,7 @@ class MainWindow(QMainWindow):
         settings.setValue("x_major_ticks", self.ui.xMajorTicks_spin.value())
         settings.setValue("y_minor_ticks", self.ui.yMinorTicks_spin.value())
         settings.setValue("y_major_ticks", self.ui.yMajorTicks_spin.value())
+        settings.setValue("series_width", self.ui.seriesWidth_spin.value())
 
     def _load_plugins(self) -> None:
         pm: PluginManager = PluginManagerSingleton.get()
@@ -150,6 +153,7 @@ class MainWindow(QMainWindow):
         self.ui.treeWidget.resizeColumnToContents(0)
         self.ui.treeWidget.resizeColumnToContents(1)
 
+        controller.series_width = self._series_width
         controller.marker_count = self._marker_count
         controller.marker_size = self._marker_size
 
@@ -257,7 +261,7 @@ class MainWindow(QMainWindow):
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
-                "combine": BoolOption("Combine", True),
+                "combine": BoolOption("Combine", bool(len(controllers) > 1)),
             }
             dlg = OptionsDialog(options)
             if dlg.exec():
@@ -295,7 +299,7 @@ class MainWindow(QMainWindow):
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
                 "dampening": NumericOption("Dampening", 5, 0, 100),
-                "combine": BoolOption("Combine", True),
+                "combine": BoolOption("Combine", bool(len(controllers) > 1)),
             }
             dlg = OptionsDialog(options)
             if dlg.exec():
@@ -358,6 +362,11 @@ class MainWindow(QMainWindow):
             controller.y_axis.setMinorTickCount(self.ui.yMinorTicks_spin.value())
             controller.y_axis.setTickCount(self.ui.yMajorTicks_spin.value())
 
+    def _update_series_width(self) -> None:
+        controller = self.ui.treeWidget.get_current_controller()
+        if controller:
+            controller.series_width = self.ui.seriesWidth_spin.value()
+
     def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
         if not spin_box.hasFocus():
             blocked = spin_box.blockSignals(True)
@@ -367,19 +376,21 @@ class MainWindow(QMainWindow):
     def _update_chart_settings(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
+            # X-Axis group
             x_axis = controller.x_axis
-            y_axis = controller.y_axis
-
             self._set_value_silent(self.ui.xMin_spin, x_axis.min())
             self._set_value_silent(self.ui.xMax_spin, x_axis.max())
             self._set_value_silent(self.ui.xMinorTicks_spin, x_axis.minorTickCount())
             self._set_value_silent(self.ui.xMajorTicks_spin, x_axis.tickCount())
-
+            # Y-Axis group
+            y_axis = controller.y_axis
             self._set_value_silent(self.ui.yMin_spin, y_axis.min())
             self._set_value_silent(self.ui.yMax_spin, y_axis.max())
             self._set_value_silent(self.ui.yMinorTicks_spin, y_axis.minorTickCount())
             self._set_value_silent(self.ui.yMajorTicks_spin, y_axis.tickCount())
-
+            # Series group
+            self._set_value_silent(self.ui.seriesWidth_spin, controller.series_width)
+            # Marker group
             self._set_value_silent(self.ui.markerSize_spin, controller.marker_size)
             self._set_value_silent(self.ui.markerCount_spin, controller.marker_count)
             self.ui.marker_group.setChecked(controller.display_markers)
