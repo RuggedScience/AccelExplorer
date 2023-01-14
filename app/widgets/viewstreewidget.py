@@ -22,8 +22,7 @@ class ViewsTreeWidget(QTreeWidget):
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.itemChanged.connect(self._item_changed)
 
-        self._drag_controller = None
-        self._drag_df = None
+        self._drag_dfs = None
         self._controllers: Dict[QTreeWidgetItem, ViewController] = {}
 
     def add_view(self, controller: ViewController) -> None:
@@ -51,35 +50,35 @@ class ViewsTreeWidget(QTreeWidget):
         return controller
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        item = self.itemAt(event.pos())
-        # If this item has no parent it's a top level view.
-        # We can just use the entire dataframe for the drop.
-        self._drag_controller = self.get_controller(item)
-        if self._drag_controller is not None:
-            if item.parent() is None:
-                self._drag_df = self._drag_controller.df
-            else:
-                series_name = item.text(0)
-                if series_name in self._drag_controller.df:
-                    self._drag_df = self._drag_controller.df[series_name].to_frame()
+        controllers = self.get_selected_controllers()
+        self._drag_dfs = {}
+        for controller in controllers:
+            df = controller.df
+            cols = []
+            for col in df:
+                if col in controller:
+                    if controller[col].tree_item.isSelected():
+                        cols.append(col)
+
+            self._drag_dfs[controller] = df[cols]
 
         return super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self._drag_controller = None
+        self._drag_dfs = None
         return super().mouseReleaseEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         return super().dragEnterEvent(event)
 
     def _drag_is_valid(self) -> bool:
-        return self._drag_controller is not None and self._drag_df is not None
+        return bool(self._drag_dfs)
 
     def _drop_is_valid(self, controller: ViewController) -> bool:
         return (
             controller
-            and controller is not self._drag_controller
-            and controller.can_add_data(self._drag_df)
+            and controller not in self._drag_dfs
+            and controller.can_add_data(self._drag_dfs.values())
         )
 
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
@@ -99,7 +98,8 @@ class ViewsTreeWidget(QTreeWidget):
             drop_item = self.itemAt(event.pos())
             drop_controller = self.get_controller(drop_item)
             if self._drop_is_valid(drop_controller):
-                drop_controller.add_data(self._drag_controller.name, self._drag_df)
+                for controller, df in self._drag_dfs.items():
+                    drop_controller.add_data(controller.name, df)
                 event.acceptProposedAction()
                 self.setCurrentItem(drop_item)
                 return
@@ -127,7 +127,8 @@ class ViewsTreeWidget(QTreeWidget):
         self.currentViewChanged.emit(new, old)
 
     def _selection_changed(self) -> None:
-        self.selectionChanged.emit(self.get_selected_controllers())
+        controllers = self.get_selected_controllers()
+        self.selectionChanged.emit(controllers)
 
     def _get_root_parent(self, item):
         while item and item.parent() is not None:

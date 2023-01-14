@@ -272,8 +272,11 @@ class ViewController(QObject):
         cmd = DataCommand(title, self, self._df, df)
         self._undo_stack.push(cmd)
 
-    def can_add_data(self, df: pd.DataFrame) -> bool:
-        return df.index.inferred_type == self._df.index.inferred_type
+    def can_add_data(self, dfs: List[pd.DataFrame]) -> bool:
+        for df in dfs:
+            if df.index.inferred_type != self._df.index.inferred_type:
+                return False
+        return True
 
     def add_data(
         self,
