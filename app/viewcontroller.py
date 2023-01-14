@@ -260,6 +260,10 @@ class ViewController(QObject):
         df: pd.DataFrame,
         points: Dict[str, List[QPointF]] = None,
     ) -> None:
+        df = df.add_suffix(f" - {name}")
+
+        # Handle case where same data is dropped twice.
+        # Just rename the col to "col_name (1)", "col_name (2)", etc...
         for col in df:
             i = 1
             old_name = col
