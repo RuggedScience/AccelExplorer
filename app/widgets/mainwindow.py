@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
-from app.plugins.options import NumericOption
+from app.plugins.options import NumericOption, BoolOption
 from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import timing
@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
         # Actions
         self.ui.actionOpen.triggered.connect(self._open_files)
         self.ui.actionFit_Contents.triggered.connect(self._fit_to_contents)
-        self.ui.actionClose.triggered.connect(self._close_current_view)
+        self.ui.actionClose.triggered.connect(self._close_current_selection)
         self.ui.actionExport.triggered.connect(self._export_current_view)
         self.ui.actionCrop.triggered.connect(self._crop_current_view)
         self.ui.actionFFT.triggered.connect(self._fft_current_view)
@@ -223,9 +223,10 @@ class MainWindow(QMainWindow):
         else:
             super().dropEvent(event)
 
-    def _close_current_view(self) -> None:
-        controller = self.ui.treeWidget.remove_current_view()
-        if controller:
+    def _close_current_selection(self) -> None:
+        controllers = self.ui.treeWidget.get_selected_controllers()
+        for controller in controllers:
+            self.ui.treeWidget.remove_view(controller)
             self.ui.stackedWidget.removeWidget(controller.chart_view)
             controller.deleteLater()
 
@@ -256,19 +257,33 @@ class MainWindow(QMainWindow):
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
+                "combine": BoolOption("Combine", True),
             }
             dlg = OptionsDialog(options)
             if dlg.exec():
                 values = dlg.values
                 min_x = values.get("min_freq", 10)
                 max_x = values.get("max_freq", 1000)
+                combine = values.get("combine")
 
+                dfs = {}
                 for controller in controllers:
-                    fft: pd.DataFrame = ed.calc.fft.fft(controller.df)
-                    fft = fft[(fft.index >= min_x) & (fft.index <= max_x)]
+                    df: pd.DataFrame = ed.calc.fft.fft(controller.df)
+                    # Clamp to min / max values
+                    df = df[(df.index >= min_x) & (df.index <= max_x)]
+                    if combine:
+                        df = df.add_suffix(f" - {controller.name}")
+                        if not dfs:
+                            dfs["FFT"] = df
+                        else:
+                            dfs["FFT"] = pd.concat([dfs["FFT"], df], axis="columns")
+                    else:
+                        dfs[f"FFT - {controller.name}"] = df
+
+                for name, df in dfs.items():
                     self._add_view(
-                        f"FFT - {controller.name}",
-                        fft,
+                        name,
+                        df,
                         "Frequency (Hz)",
                         "Magnitude",
                     )
@@ -280,6 +295,7 @@ class MainWindow(QMainWindow):
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
                 "dampening": NumericOption("Dampening", 5, 0, 100),
+                "combine": BoolOption("Combine", True),
             }
             dlg = OptionsDialog(options)
             if dlg.exec():
@@ -287,18 +303,31 @@ class MainWindow(QMainWindow):
                 min_x = values.get("min_freq", 10)
                 max_x = values.get("max_freq", 1000)
                 dampening = values.get("dampening", 5) / 100
+                combine = values.get("combine")
+
+                dfs = {}
                 for controller in controllers:
-                    srs: pd.DataFrame = ed.calc.shock.shock_spectrum(
+                    df: pd.DataFrame = ed.calc.shock.shock_spectrum(
                         controller.df,
                         damp=dampening,
                         init_freq=min_x,
                         mode="srs",
                     )
+                    # Clamp to max value. init_freq parameter will handle min value.
+                    df = df[df.index <= max_x]
+                    if combine:
+                        df = df.add_suffix(f" - {controller.name}")
+                        if not dfs:
+                            dfs["SRS"] = df
+                        else:
+                            dfs["SRS"] = pd.concat([dfs["SRS"], df], axis="columns")
+                    else:
+                        dfs[f"SRS - {controller.name}"] = df
 
-                    srs = srs[srs.index <= max_x]
+                for name, df in dfs.items():
                     self._add_view(
-                        f"FFT - {controller.name}",
-                        srs,
+                        name,
+                        df,
                         "Frequency (Hz)",
                         "Magnitude",
                         display_markers=True,
