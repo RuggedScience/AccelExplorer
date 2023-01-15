@@ -115,7 +115,7 @@ class ViewsTreeWidget(QTreeWidget):
                 if parent is item:
                     controller.name = item.text(0)
                 elif item in controller:
-                    controller.rename_series(item, item.text(0))
+                    controller.rename_series(item)
                     controller[item].chart_series.setVisible(
                         item.checkState(0) == Qt.Checked
                     )

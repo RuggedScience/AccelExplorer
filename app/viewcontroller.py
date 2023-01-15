@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Dict, List
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -8,8 +8,15 @@ from PySide6.QtCore import QObject, QPointF, Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QUndoStack, QImage, QColor
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
-from app.commands.viewcommands import CropCommand, DataCommand, AddDataCommand
-from app.utils import df_to_points
+from app.commands.viewcommands import (
+    ColorCommand,
+    CropCommand,
+    DataCommand,
+    AddDataCommand,
+    RenameViewCommand,
+    RenameSeriesCommand,
+)
+from app.utils import df_to_points, SignalBlocker
 from app.utils.markergenerator import MarkerGenerator
 from app.widgets.interactivechart import InteractiveChart
 from app.widgets.colorwidget import ColorWidget
@@ -38,17 +45,12 @@ class ViewSeries(QObject):
                 self._tree_item, 1, self._color_widget
             )
 
-        self.name = name
+        self._name = ""
+        self._rename(name)
 
     @property
     def name(self) -> str:
         return self._name
-
-    @name.setter
-    def name(self, name: str) -> None:
-        self._chart_series.setName(name)
-        self._tree_item.setText(0, name)
-        self._name = name
 
     @property
     def chart_series(self) -> QLineSeries:
@@ -59,11 +61,11 @@ class ViewSeries(QObject):
         return self._tree_item
 
     @property
-    def points(self) -> List[QPointF]:
+    def points(self) -> list[QPointF]:
         return self._chart_series.points()
 
     @points.setter
-    def points(self, points: List[QPointF]) -> None:
+    def points(self, points: list[QPointF]) -> None:
         self.chart_series.replace(points)
         # Only use OpenGL with large datasets
         use_opengl = len(points) > 100000
@@ -80,10 +82,6 @@ class ViewSeries(QObject):
     def color(self) -> QColor:
         return self._chart_series.color()
 
-    @color.setter
-    def color(self, color: QColor) -> None:
-        self._chart_series.setColor(color)
-
     @property
     def width(self) -> int:
         return self._chart_series.pen().width()
@@ -94,7 +92,16 @@ class ViewSeries(QObject):
         pen.setWidth(width)
         self._chart_series.setPen(pen)
 
-    def _color_changed(self, color: QColor):
+    def _rename(self, name: str) -> None:
+        if self._name != name:
+            self._name = name
+            self._tree_item.setText(0, name)
+            self._chart_series.setName(name)
+
+    def _set_color(self, color: QColor) -> None:
+        self._chart_series.setColor(color)
+
+    def _color_changed(self, color: QColor) -> None:
         self._color_widget.color = color
 
 
@@ -110,8 +117,8 @@ class ViewController(QObject):
         parent: QObject = None,
     ):
         super().__init__(parent)
-
-        self._view_series: Dict[QTreeWidgetItem, ViewSeries] = {}
+        self._name = ""
+        self._view_series: dict[QTreeWidgetItem, ViewSeries] = {}
 
         self._series_width = 1
         self._marker_size = 10
@@ -138,7 +145,7 @@ class ViewController(QObject):
 
         self._chart_view.addActions([undo_action, redo_action])
 
-        self.name = name
+        self._rename(name)
         self._replace_data(df)
 
         self.fit_contents()
@@ -178,9 +185,9 @@ class ViewController(QObject):
 
     @name.setter
     def name(self, name: str):
-        self._tree_item.setText(0, name)
-        self.chart.setTitle(name)
-        self._name = name
+        if name != self._name:
+            cmd = RenameViewCommand(self, name)
+            self._undo_stack.push(cmd)
 
     @property
     def tree_item(self) -> QTreeWidgetItem:
@@ -272,7 +279,7 @@ class ViewController(QObject):
         cmd = DataCommand(title, self, self._df, df)
         self._undo_stack.push(cmd)
 
-    def can_add_data(self, dfs: List[pd.DataFrame]) -> bool:
+    def can_add_data(self, dfs: list[pd.DataFrame]) -> bool:
         for df in dfs:
             if df.index.inferred_type != self._df.index.inferred_type:
                 return False
@@ -282,7 +289,7 @@ class ViewController(QObject):
         self,
         name: str,
         df: pd.DataFrame,
-        points: Dict[str, List[QPointF]] = None,
+        points: dict[str, dict[QPointF]] = None,
     ) -> None:
         df = df.add_suffix(f" - {name}")
 
@@ -304,7 +311,7 @@ class ViewController(QObject):
         cmd = AddDataCommand(name, self, df, points)
         self._undo_stack.push(cmd)
 
-    def _add_data(self, df: pd.DataFrame, points: Dict[str, List[QPointF]]):
+    def _add_data(self, df: pd.DataFrame, points: dict[str, list[QPointF]]):
         self._df = pd.concat([self._df, df], axis="columns")
         self._df = self._df.sort_index()
         for name, data in points.items():
@@ -369,20 +376,32 @@ class ViewController(QObject):
 
         self.setAxisRanges(x_min, x_max, y_min, y_max)
 
-    def rename_series(self, series: QTreeWidgetItem | str, name: str):
-        view_series = None
-        if isinstance(series, QTreeWidgetItem):
-            view_series = self._view_series.get(series)
-        elif isinstance(series, str):
-            view_series = self._get_series_from_name(series)
+    def _rename(self, name: str) -> None:
+        if self._name != name:
+            with SignalBlocker(self._tree_item.treeWidget()):
+                self._tree_item.setText(0, name)
+                self.chart.setTitle(name)
+                self._name = name
 
-        if view_series is None or view_series.name not in self._df:
-            raise ValueError(f"Series not in {self.name}")
+    def rename_series(self, item: QTreeWidgetItem) -> None:
+        cmd = None
+        if item in self:
+            series = self[item]
+            if series.name != item.text(0):
+                cmd = RenameSeriesCommand(self, series, item.text(0))
+                self._undo_stack.push(cmd)
 
-        self._df = self._df.rename(columns={view_series.name: name})
-        view_series.name = name
+    def set_series_color(self, series: ViewSeries, color: QColor) -> None:
+        if color != series.color:
+            cmd = ColorCommand(series, color)
+            self._undo_stack.push(cmd)
 
-    def _point_hovered(self, pos: QPointF, state: bool):
+    def _rename_series(self, series: ViewSeries, name: str) -> None:
+        self._df = self._df.rename(columns={series.name: name})
+        with SignalBlocker(self._tree_item.treeWidget()):
+            series._rename(name)
+
+    def _point_hovered(self, pos: QPointF, state: bool) -> None:
         if state:
             x_title = self.chart.axisX().titleText()
             y_title = self.chart.axisY().titleText()

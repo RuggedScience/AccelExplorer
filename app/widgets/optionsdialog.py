@@ -32,3 +32,7 @@ class OptionsDialog(QDialog):
     @property
     def values(self) -> Dict[str, Any]:
         return self._options_manager.values
+
+    def exec(self) -> Dict[str, Any]:
+        if super().exec():
+            return self.values

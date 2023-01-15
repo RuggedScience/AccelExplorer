@@ -1,7 +1,7 @@
 import os
 import sys
 
-from typing import List, Dict
+from collections.abc import Iterable
 
 from functools import wraps
 from time import time
@@ -9,6 +9,7 @@ from time import time
 import pandas as pd
 
 from PySide6.QtCore import QPointF
+from PySide6.QtWidgets import QWidget
 
 
 def _we_are_frozen():
@@ -42,16 +43,35 @@ def timing(f):
     return wrap
 
 
-def series_to_points(series: pd.Series) -> List[QPointF]:
+def series_to_points(series: pd.Series) -> list[QPointF]:
     if series.index.inferred_type == "timedelta64":
         series.index = series.index.total_seconds()
 
     return [QPointF(float(i), float(v)) for i, v in series.items()]
 
 
-def df_to_points(df: pd.DataFrame) -> Dict[str, List[QPointF]]:
+def df_to_points(df: pd.DataFrame) -> list[str, list[QPointF]]:
     d = {}
     for col, series in df.items():
         points = series_to_points(series)
         d[col] = points
     return d
+
+
+class SignalBlocker:
+    def __init__(self, widgets: Iterable[QWidget] | QWidget) -> None:
+        if not isinstance(widgets, Iterable):
+            widgets = (widgets,)
+
+        self._widgets = widgets
+        self._blocking: dict[QWidget, bool] = {}
+
+    def __enter__(self) -> None:
+        for widget in self._widgets:
+            if widget:
+                self._blocking[widget] = widget.blockSignals(True)
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        for widget in self._widgets:
+            if widget:
+                widget.blockSignals(self._blocking[widget])

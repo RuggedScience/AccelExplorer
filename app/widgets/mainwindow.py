@@ -17,7 +17,7 @@ from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 from app.plugins.options import NumericOption, BoolOption
 from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
-from app.utils import timing
+from app.utils import timing, SignalBlocker
 from app.viewcontroller import ViewController, ViewSeries
 from app.widgets.optionsdialog import OptionsDialog
 from app.widgets.parserdialog import ParserDialog
@@ -237,9 +237,9 @@ class MainWindow(QMainWindow):
     def _export_current_view(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
-            item = controller.item
+            item = controller.tree_item
             suggested_name = item.text(0).split(".")[0]
-            fileName, _ = QFileDialog.getSaveFileName(
+            fileName, filter = QFileDialog.getSaveFileName(
                 self, "Export File", suggested_name, "CSV (*.csv)"
             )
             if fileName:
@@ -261,11 +261,13 @@ class MainWindow(QMainWindow):
             options = {
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
-                "combine": BoolOption("Combine", bool(len(controllers) > 1)),
             }
-            dlg = OptionsDialog(options)
-            if dlg.exec():
-                values = dlg.values
+            # Only add the combine option if we have more than one controller
+            if len(controllers > 1):
+                options["combine"] = (BoolOption("Combine", True),)
+
+            values = OptionsDialog(options, self).exec()
+            if values:
                 min_x = values.get("min_freq", 10)
                 max_x = values.get("max_freq", 1000)
                 combine = values.get("combine")
@@ -299,11 +301,12 @@ class MainWindow(QMainWindow):
                 "min_freq": NumericOption("Min Freq", 10, 1, None),
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
                 "dampening": NumericOption("Dampening", 5, 0, 100),
-                "combine": BoolOption("Combine", bool(len(controllers) > 1)),
             }
-            dlg = OptionsDialog(options)
-            if dlg.exec():
-                values = dlg.values
+            if len(controllers > 1):
+                options["combine"] = BoolOption("Combine", True)
+
+            values = OptionsDialog(options, self).exec()
+            if values:
                 min_x = values.get("min_freq", 10)
                 max_x = values.get("max_freq", 1000)
                 dampening = values.get("dampening", 5) / 100
@@ -369,9 +372,8 @@ class MainWindow(QMainWindow):
 
     def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
         if not spin_box.hasFocus():
-            blocked = spin_box.blockSignals(True)
-            spin_box.setValue(value)
-            spin_box.blockSignals(blocked)
+            with SignalBlocker(spin_box):
+                spin_box.setValue(value)
 
     def _update_chart_settings(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -442,9 +444,11 @@ class MainWindow(QMainWindow):
         self.ui.actionSRS.setEnabled(enable)
 
     def _series_legend_clicked(self, series: ViewSeries):
-        color = QColorDialog.getColor(series.color, self)
-        if color.isValid():
-            series.color = color
+        sender = self.sender()
+        if isinstance(sender, ViewController):
+            color = QColorDialog.getColor(series.color, self)
+            if color.isValid():
+                sender.set_series_color(series, color)
 
     def _open_files(self) -> None:
         filters = "Data files ("

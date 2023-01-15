@@ -31,19 +31,19 @@ class ViewCommand(QUndoCommand):
     def id(self) -> int:
         return 1
 
-    def undo(self) -> None:
-        if self._old_df is not None:
-            self._controller._replace_data(self._old_df)
-
-        if self._old_ranges is not None:
-            self._controller.setAxisRanges(*self._old_ranges, block=True)
-
     def redo(self) -> None:
         if self._new_df is not None:
             self._controller._replace_data(self._new_df)
 
         if self._new_ranges is not None:
             self._controller.setAxisRanges(*self._new_ranges, block=True)
+
+    def undo(self) -> None:
+        if self._old_df is not None:
+            self._controller._replace_data(self._old_df)
+
+        if self._old_ranges is not None:
+            self._controller.setAxisRanges(*self._old_ranges, block=True)
 
     def mergeWith(self, other: QUndoCommand) -> bool:
         if isinstance(other, ViewCommand):

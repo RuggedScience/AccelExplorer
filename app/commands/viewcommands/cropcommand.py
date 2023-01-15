@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 from PySide6.QtGui import QUndoCommand
-from PySide6.QtCharts import QLineSeries
 
 if TYPE_CHECKING:
     from typing import Dict, List
@@ -41,8 +40,8 @@ class CropCommand(QUndoCommand):
         self._controller._axis_range_changed()
         self._controller.fit_contents()
 
-    def undo(self) -> None:
-        self._update_view(self._old_df, self._old_points)
-
     def redo(self) -> None:
         self._update_view(self._new_df, self._new_points)
+
+    def undo(self) -> None:
+        self._update_view(self._old_df, self._old_points)

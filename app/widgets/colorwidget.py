@@ -95,12 +95,13 @@ class _ColorWidget(QFrame):
 
     @color.setter
     def color(self, color: QColor) -> None:
-        self._color = color
-        pal = self.palette()
-        pal.setColor(pal.ColorRole.Window, color)
-        pal.setColor(pal.ColorRole.Base, color)
-        self.setPalette(pal)
-        self.repaint()
+        if color != self._color:
+            self._color = color
+            pal = self.palette()
+            pal.setColor(pal.ColorRole.Window, color)
+            pal.setColor(pal.ColorRole.Base, color)
+            self.setPalette(pal)
+            self.repaint()
 
     @property
     def border_width(self) -> int:
