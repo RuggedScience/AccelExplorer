@@ -50,6 +50,9 @@ class ViewsTreeWidget(QTreeWidget):
         return controller
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        # Call the mouse event first so the selections are updated
+        super().mousePressEvent(event)
+
         controllers = self.get_selected_controllers()
         self._drag_dfs = {}
         for controller in controllers:
@@ -61,8 +64,6 @@ class ViewsTreeWidget(QTreeWidget):
                         cols.append(col)
 
             self._drag_dfs[controller] = df[cols]
-
-        return super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._drag_dfs = None
