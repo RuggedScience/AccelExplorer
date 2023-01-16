@@ -3,8 +3,14 @@ from typing import List
 
 import endaq as ed
 import pandas as pd
-from PySide6.QtCore import QFileInfo, QSettings, Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDragMoveEvent, QDropEvent
+from PySide6.QtCore import QFileInfo, QSettings, Qt, QTimer, QObject
+from PySide6.QtGui import (
+    QCloseEvent,
+    QDragEnterEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QAction,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -14,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
+from app.plugins.dataframeplugins import DataFramePlugin, ViewPlugin, FilterPlugin
 from app.plugins.options import NumericOption, BoolOption
 from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
@@ -21,6 +28,17 @@ from app.utils import timing, SignalBlocker
 from app.viewcontroller import ViewController, ViewSeries
 from app.widgets.optionsdialog import OptionsDialog
 from app.widgets.parserdialog import ParserDialog
+
+
+class DataframePluginAction(QAction):
+    def __init__(self, plugin: DataFramePlugin, parent: QObject = None):
+        super().__init__(plugin.name, parent)
+        self.setToolTip(plugin.description)
+        self._plugin = plugin.plugin_object
+
+    @property
+    def plugin(self) -> DataFramePlugin:
+        return self._plugin
 
 
 class MainWindow(QMainWindow):
@@ -35,6 +53,13 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self._load_plugins()
         self._load_settings()
+
+        self.ui.menuView.addAction(self.ui.viewsDockWidget.toggleViewAction())
+        self.ui.menuView.addAction(self.ui.chartSettingsDockWidget.toggleViewAction())
+        self.ui.menuView.addAction(self.ui.undoDockWidget.toggleViewAction())
+
+        self.ui.menuFilters.setEnabled(not self.ui.menuFilters.isEmpty())
+        self.ui.menuViews.setEnabled(not self.ui.menuViews.isEmpty())
 
     @property
     def supported_extensions(self) -> List[str]:
@@ -121,6 +146,15 @@ class MainWindow(QMainWindow):
         self._parsers: List[CSVParser] = [
             plugin.plugin_object for plugin in pm.getPluginsOfCategory("parsers")
         ]
+
+        for plugin in pm.getPluginsOfCategory("dataframe"):
+            action = DataframePluginAction(plugin, self)
+            action.setEnabled(False)
+            action.triggered.connect(self._plugin_action_triggered)
+            if isinstance(action.plugin, ViewPlugin):
+                self.ui.menuViews.addAction(action)
+            elif isinstance(action.plugin, FilterPlugin):
+                self.ui.menuFilters.addAction(action)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_settings()
@@ -431,7 +465,7 @@ class MainWindow(QMainWindow):
             x_axis.disconnect(self)
             y_axis.disconnect(self)
 
-        self.ui.chartSettingsDockWidget.setEnabled((current != None))
+        self.ui.chartSettingsWidget.setEnabled((current != None))
 
         if current:
             self._update_chart_settings()
@@ -449,11 +483,20 @@ class MainWindow(QMainWindow):
             self.ui.stackedWidget.setCurrentWidget(current.chart_view)
             self.ui.undoView.setStack(current.undo_stack)
 
+            for action in self.ui.menuViews.actions():
+                if isinstance(action, DataframePluginAction):
+                    action.setEnabled(action.plugin.can_process(current.df))
+
+            for action in self.ui.menuFilters.actions():
+                if isinstance(action, DataframePluginAction):
+                    action.setEnabled(action.plugin.can_process(current.df))
+
         enable = current is not None
         self.ui.actionFit_Contents.setEnabled(enable)
         self.ui.actionClose.setEnabled(enable)
         self.ui.actionExport.setEnabled(enable)
         self.ui.actionCrop.setEnabled(enable)
+        self.ui.menuData.setEnabled(enable)
 
     def _selection_changed(self, controllers: List[ViewController]) -> None:
         enable = True
@@ -483,3 +526,21 @@ class MainWindow(QMainWindow):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files", "", filters)
         if files:
             self._add_files([QFileInfo(filename) for filename in files])
+
+    def _plugin_action_triggered(self) -> None:
+        sender = self.sender()
+        controller = self.ui.treeWidget.get_current_controller()
+        if controller and isinstance(sender, DataframePluginAction):
+            plugin = sender.plugin
+            options = OptionsDialog(plugin.options, self).exec()
+            if options:
+                df = plugin.process(controller.df, **options)
+                if isinstance(plugin, ViewPlugin):
+                    self._add_view(
+                        f"{sender.text()} - {controller.name}",
+                        df,
+                        plugin.x_title,
+                        plugin.y_title,
+                    )
+                elif isinstance(plugin, FilterPlugin):
+                    controller.set_df(df, f"{sender.text()}")
