@@ -309,7 +309,7 @@ class MainWindow(QMainWindow):
                 "max_freq": NumericOption("Max Freq", 1000, 1, None),
                 "dampening": NumericOption("Dampening", 5, 0, 100),
             }
-            if len(controllers > 1):
+            if len(controllers) > 1:
                 options["combine"] = BoolOption("Combine", True)
 
             values = OptionsDialog(options, self).exec()
