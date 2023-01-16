@@ -160,7 +160,7 @@ class ViewsTreeWidget(QTreeWidget):
 
     def _item_clicked(self, item: QTreeWidgetItem, col: int) -> None:
         controller = self.get_controller(item)
-        # Automatically select all series when a view is selected
-        if controller and item is controller.tree_item:
+        # Automatically deselect all series when a view is deselected
+        if controller and item is controller.tree_item and not item.isSelected():
             for series in controller:
                 series.tree_item.setSelected(item.isSelected())

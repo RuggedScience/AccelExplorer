@@ -62,6 +62,7 @@ class MainWindow(QMainWindow):
         self.ui.yMajorTicks_spin.valueChanged.connect(self._update_tick_counts)
         # Series Group
         self.ui.seriesWidth_spin.valueChanged.connect(self._update_series_width)
+        self.ui.selectedSeriesWidth_spin.valueChanged.connect(self._update_series_width)
         # Markers
         self.ui.marker_group.clicked.connect(self._update_markers)
         self.ui.markerSize_spin.valueChanged.connect(self._update_markers)
@@ -91,6 +92,9 @@ class MainWindow(QMainWindow):
         self._y_minor_ticks = settings.value("y_minor_ticks", 0)
         self._y_major_ticks = settings.value("y_major_ticks", 5)
         self._series_width = settings.value("series_width", 2)
+        self._selected_series_width = settings.value("selected_series_width", 5)
+
+        self.ui.selectedSeriesWidth_spin.setValue(self._selected_series_width)
 
     def _save_settings(self) -> None:
         settings = QSettings()
@@ -106,6 +110,9 @@ class MainWindow(QMainWindow):
         settings.setValue("y_minor_ticks", self.ui.yMinorTicks_spin.value())
         settings.setValue("y_major_ticks", self.ui.yMajorTicks_spin.value())
         settings.setValue("series_width", self.ui.seriesWidth_spin.value())
+        settings.setValue(
+            "selected_series_width", self.ui.selectedSeriesWidth_spin.value()
+        )
 
     def _load_plugins(self) -> None:
         pm: PluginManager = PluginManagerSingleton.get()
@@ -368,7 +375,23 @@ class MainWindow(QMainWindow):
     def _update_series_width(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
-            controller.series_width = self.ui.seriesWidth_spin.value()
+            selected = []
+            not_selected = []
+            for series in controller:
+                if series.tree_item.isSelected():
+                    selected.append(series)
+                else:
+                    not_selected.append(series)
+
+            if not not_selected:
+                not_selected = selected.copy()
+                selected.clear()
+
+            for series in selected:
+                series.width = self.ui.selectedSeriesWidth_spin.value()
+
+            for series in not_selected:
+                series.width = self.ui.seriesWidth_spin.value()
 
     def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
         if not spin_box.hasFocus():
@@ -442,6 +465,8 @@ class MainWindow(QMainWindow):
 
         self.ui.actionFFT.setEnabled(enable)
         self.ui.actionSRS.setEnabled(enable)
+
+        self._update_series_width()
 
     def _series_legend_clicked(self, series: ViewSeries):
         sender = self.sender()
