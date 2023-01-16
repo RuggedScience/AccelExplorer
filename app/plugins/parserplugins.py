@@ -63,13 +63,16 @@ class CSVParser(ParserPlugin):
                 inplace=True,
             )
         elif index_type and index_type != "number":
-            time_units = None
-            if index_type != "timestamp":
-                time_units = index_type
-                start_time = df.index[0]
-                if start_time != 0:
-                    df.index = df.index - start_time
+            time_units = index_type
+            if index_type == "timestamp":
+                time_units = None
+
+                # if start_time != 0:
+                # df.index = df.index - start_time
             df.index = pd.to_timedelta(df.index, unit=time_units)
+
+            start_time = df.index[0]
+            df.index = df.index - start_time
 
         if df.index.inferred_type == "timedelta64":
             df.index.rename("Time (s)", inplace=True)
