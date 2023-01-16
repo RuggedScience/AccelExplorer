@@ -48,10 +48,6 @@ class CSVParser(ParserPlugin):
             index_type = index_type.lower()
 
         df = pd.read_csv(filename, header=header_row - 1, **kwargs)
-        df.dropna(axis="columns", inplace=True)
-        if df.isna().values.any():
-            raise ValueError()
-
         for col in df:
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise ValueError()
