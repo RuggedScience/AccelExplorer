@@ -1,5 +1,4 @@
 from collections import namedtuple
-from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -179,6 +178,9 @@ class ViewController(QObject):
     def __iter__(self):
         yield from self._view_series.values()
 
+    def __len__(self):
+        return len(self._view_series)
+
     @property
     def name(self) -> str:
         return self._name
@@ -264,6 +266,10 @@ class ViewController(QObject):
             self._marker_count = count
             if self._display_markers:
                 self._update_marker_points()
+
+    @property
+    def selected_series(self) -> list[ViewSeries]:
+        return [series for series in self if series.tree_item.isSelected()]
 
     def setAxisRanges(
         self,

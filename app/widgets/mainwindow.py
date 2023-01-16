@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         # Views tree widget
         self.ui.treeWidget.currentViewChanged.connect(self._current_view_changed)
-        self.ui.treeWidget.selectionChanged.connect(self._selection_changed)
+        self.ui.treeWidget.viewSelectionChanged.connect(self._selection_changed)
         # Chart X-Axis Ranges
         self.ui.xMin_spin.valueChanged.connect(self._update_chart_ranges)
         self.ui.xMax_spin.valueChanged.connect(self._update_chart_ranges)

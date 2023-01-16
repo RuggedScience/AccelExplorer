@@ -1,21 +1,22 @@
-from typing import Optional, Dict, List
+from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, QItemSelection
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
 from app.viewcontroller import ViewController
 
 
 class ViewsTreeWidget(QTreeWidget):
     currentViewChanged = Signal(ViewController, ViewController)
-    selectionChanged = Signal(list)
+    viewSelectionChanged = Signal(list)
 
     def __init__(self, parent: Optional[QWidget] = ...) -> None:
         super().__init__(parent)
 
         self.currentItemChanged.connect(self._current_item_changed)
         self.itemSelectionChanged.connect(self._selection_changed)
+        self.itemClicked.connect(self._item_clicked)
 
         self.setDragDropMode(QTreeWidget.DragDropMode.DragDrop)
         self.setEditTriggers(QTreeWidget.EditTrigger.DoubleClicked)
@@ -23,7 +24,7 @@ class ViewsTreeWidget(QTreeWidget):
         self.itemChanged.connect(self._item_changed)
 
         self._drag_dfs = None
-        self._controllers: Dict[QTreeWidgetItem, ViewController] = {}
+        self._controllers: dict[QTreeWidgetItem, ViewController] = {}
 
     def add_view(self, controller: ViewController) -> None:
         items = [controller.tree_item] + [view.tree_item for view in controller]
@@ -57,13 +58,16 @@ class ViewsTreeWidget(QTreeWidget):
         self._drag_dfs = {}
         for controller in controllers:
             df = controller.df
-            cols = []
-            for col in df:
-                if col in controller:
-                    if controller[col].tree_item.isSelected():
-                        cols.append(col)
+            if not controller.tree_item.isSelected():
+                cols = []
+                for col in df:
+                    if col in controller:
+                        if controller[col].tree_item.isSelected():
+                            cols.append(col)
 
-            self._drag_dfs[controller] = df[cols]
+                df = df[cols]
+
+            self._drag_dfs[controller] = df
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._drag_dfs = None
@@ -129,7 +133,7 @@ class ViewsTreeWidget(QTreeWidget):
 
     def _selection_changed(self) -> None:
         controllers = self.get_selected_controllers()
-        self.selectionChanged.emit(controllers)
+        self.viewSelectionChanged.emit(controllers)
 
     def _get_root_parent(self, item):
         while item and item.parent() is not None:
@@ -147,9 +151,16 @@ class ViewsTreeWidget(QTreeWidget):
     def get_current_controller(self) -> ViewController:
         return self.get_controller(self.currentItem())
 
-    def get_selected_controllers(self) -> List[ViewController]:
+    def get_selected_controllers(self) -> list[ViewController]:
         controllers = []
         for item in self.selectedItems():
             controllers.append(self.get_controller(item))
 
         return list(set(controllers))
+
+    def _item_clicked(self, item: QTreeWidgetItem, col: int) -> None:
+        controller = self.get_controller(item)
+        # Automatically select all series when a view is selected
+        if controller and item is controller.tree_item:
+            for series in controller:
+                series.tree_item.setSelected(item.isSelected())
