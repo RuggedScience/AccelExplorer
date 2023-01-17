@@ -95,6 +95,7 @@
    <addaction name="separator"/>
    <addaction name="actionFit_Contents"/>
    <addaction name="actionCrop"/>
+   <addaction name="separator"/>
    <addaction name="actionFFT"/>
    <addaction name="actionSRS"/>
   </widget>

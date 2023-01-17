@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         # Views tree widget
         self.ui.treeWidget.currentViewChanged.connect(self._current_view_changed)
         self.ui.treeWidget.viewSelectionChanged.connect(self._selection_changed)
-        # self.ui.treeWidget.viewClicked.connect(self._update_series_width)
+        self.ui.treeWidget.seriesHovered.connect(self._handle_series_hovered)
         # Chart X-Axis Ranges
         self.ui.xMin_spin.valueChanged.connect(self._update_chart_ranges)
         self.ui.xMax_spin.valueChanged.connect(self._update_chart_ranges)
@@ -421,10 +421,17 @@ class MainWindow(QMainWindow):
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
             for series in controller:
-                if series.tree_item.isSelected():
-                    series.width = self.ui.selectedSeriesWidth_spin.value()
-                else:
-                    series.width = self.ui.seriesWidth_spin.value()
+                series.width = self.ui.seriesWidth_spin.value()
+
+    def _handle_series_hovered(
+        self, controller: ViewController, current: ViewSeries, previous: ViewSeries
+    ) -> None:
+        if previous:
+            previous.width = self.ui.seriesWidth_spin.value()
+
+        if controller and controller is self.ui.treeWidget.get_current_controller():
+            if current:
+                current.width = self.ui.selectedSeriesWidth_spin.value()
 
     def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
         if not spin_box.hasFocus():
@@ -508,7 +515,7 @@ class MainWindow(QMainWindow):
         self.ui.actionFFT.setEnabled(enable)
         self.ui.actionSRS.setEnabled(enable)
 
-        self._update_series_width()
+        # self._update_series_width()
 
     def _series_legend_clicked(self, series: ViewSeries):
         sender = self.sender()

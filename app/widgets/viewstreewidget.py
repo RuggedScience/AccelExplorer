@@ -4,15 +4,18 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
-from app.viewcontroller import ViewController
+from app.viewcontroller import ViewController, ViewSeries
 
 
 class ViewsTreeWidget(QTreeWidget):
     currentViewChanged = Signal(ViewController, ViewController)
     viewSelectionChanged = Signal(list)
+    seriesHovered = Signal(ViewController, ViewSeries, ViewSeries)
 
     def __init__(self, parent: Optional[QWidget] = ...) -> None:
         super().__init__(parent)
+
+        self.viewport().setMouseTracking(True)
 
         self.currentItemChanged.connect(self._current_item_changed)
         self.itemSelectionChanged.connect(self._selection_changed)
@@ -25,6 +28,8 @@ class ViewsTreeWidget(QTreeWidget):
 
         self._drag_dfs = None
         self._controllers: dict[QTreeWidgetItem, ViewController] = {}
+
+        self._hovered_series = None
 
     def add_view(self, controller: ViewController) -> None:
         items = [controller.tree_item] + [view.tree_item for view in controller]
@@ -72,6 +77,22 @@ class ViewsTreeWidget(QTreeWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._drag_dfs = None
         return super().mouseReleaseEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        new_series = None
+        controller = None
+        if event.buttons() == Qt.MouseButton.NoButton:
+            item = self.itemAt(event.pos())
+            controller = self.get_controller(item)
+
+            if controller and item in controller:
+                new_series = controller[item]
+
+        if new_series != self._hovered_series:
+            self.seriesHovered.emit(controller, new_series, self._hovered_series)
+            self._hovered_series = new_series
+
+        return super().mouseMoveEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         return super().dragEnterEvent(event)
