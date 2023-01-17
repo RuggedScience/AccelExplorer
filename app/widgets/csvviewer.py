@@ -38,6 +38,11 @@ class CSVViewer(QPlainTextEdit):
         self.updateLineNumberAreaWidth(0)
         self._line_number = None
 
+    def setPlainText(self, text: str) -> None:
+        # Reset line number when text is reset
+        self._line_number = None
+        return super().setPlainText(text)
+
     def setCurrentLine(self, line: int) -> None:
         if line == self._line_number:
             return

@@ -24,9 +24,8 @@ class AllenCSVParser(parserplugins.CSVParser):
             header_row=29,
         )
 
-        # First column should be time which we don't need since
-        # AccelCSVParser uses the sample rate to create a time index.
-        df.drop(df.columns[0], axis="columns", inplace=True)
+        # We only care about the second column which contains voltage
+        df = df.iloc(axis="columns")[1].to_frame()
 
         col_name = df.columns[0]
         df[col_name] = df[col_name].apply(lambda x: (6.6 - x) * 200)

@@ -48,9 +48,16 @@ class CSVParser(ParserPlugin):
             index_type = index_type.lower()
 
         df = pd.read_csv(filename, header=header_row - 1, **kwargs)
+        # Only keep columns with numbers
+        df = df.select_dtypes(include=["number"])
+        # Drop columns that contain only NaN values
+        df.dropna(axis="columns", how="all", inplace=True)
         for col in df:
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise ValueError()
+
+        if df.empty:
+            raise ParseError("No numeric data found")
 
         if sample_rate:
             spacing = 1 / sample_rate

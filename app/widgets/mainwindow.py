@@ -206,10 +206,28 @@ class MainWindow(QMainWindow):
 
         return controller
 
-    def _add_files(self, files: Iterable[QFileInfo]) -> None:
-        # TODO: Make parser dialog accept multiple files at once
+    def _add_file(self, fileinfo: QFileInfo | str, df: pd.DataFrame) -> None:
+        if isinstance(fileinfo, str):
+            fileinfo = QFileInfo(fileinfo)
 
+        controller = self._add_view(
+            fileinfo.fileName(),
+            df,
+            df.index.name,
+            "Acceleration (g's)",
+        )
+        # Set the original filename in the tooltip
+        # in case the user changes the name later.
+        tooltip_text = f"File: {fileinfo.fileName()}"
+        if df.index.inferred_type == "timedelta64":
+            freq = 1 / ed.calc.utils.sample_spacing(df)
+            tooltip_text += f"\nFrequency: {freq:.2f}hz"
+        controller.tree_item.setToolTip(0, tooltip_text)
+
+    def _add_files(self, files: Iterable[QFileInfo]) -> None:
+        unparsed_files = []
         for file in files:
+            df = None
             filename = file.absoluteFilePath()
             if file.suffix().lower() == "ide":
                 df: pd.DataFrame = ed.ide.get_primary_sensor_data(
@@ -227,27 +245,16 @@ class MainWindow(QMainWindow):
                     except Exception as ex:
                         pass
 
-                # If we couldn't auto parse, resort to the dialog
-                if df is None:
-                    dlg = ParserDialog(filename, parent=self)
-                    df = dlg.exec()
+            if df is not None:
+                self._add_file(file, df)
+            else:
+                unparsed_files.append(filename)
 
-                if df is None:
-                    continue
-
-            controller = self._add_view(
-                file.fileName(),
-                df,
-                df.index.name,
-                "Acceleration (g's)",
-            )
-            # Set the original filename in the tooltip
-            # in case the user changes the name later.
-            tooltip_text = f"File: {file.fileName()}"
-            if df.index.inferred_type == "timedelta64":
-                freq = 1 / ed.calc.utils.sample_spacing(df)
-                tooltip_text += f"\nFrequency: {freq:.2f}hz"
-            controller.tree_item.setToolTip(0, tooltip_text)
+        if unparsed_files:
+            dfs = ParserDialog(unparsed_files, self).exec()
+            if dfs:
+                for file, df in dfs.items():
+                    self._add_file(file, df)
 
     def _get_supported_files(self, event: QDropEvent) -> List[QFileInfo]:
         files = []
@@ -506,7 +513,7 @@ class MainWindow(QMainWindow):
         self.ui.menuData.setEnabled(enable)
 
     def _selection_changed(self, controllers: List[ViewController]) -> None:
-        enable = True
+        enable = bool(controllers)
         for controller in controllers:
             if controller.df.index.inferred_type != "timedelta64":
                 enable = False
