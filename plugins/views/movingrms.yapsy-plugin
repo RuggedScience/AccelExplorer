@@ -1,0 +1,9 @@
+[Core]
+Name = Moving RMS
+Module = movingrms
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Moving RMS
+Website = N/A

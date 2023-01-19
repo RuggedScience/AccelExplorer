@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1045</width>
-    <height>607</height>
+    <height>629</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -96,8 +96,6 @@
    <addaction name="actionFit_Contents"/>
    <addaction name="actionCrop"/>
    <addaction name="separator"/>
-   <addaction name="actionFFT"/>
-   <addaction name="actionSRS"/>
   </widget>
   <widget class="QDockWidget" name="chartSettingsDockWidget">
    <property name="enabled">
@@ -448,36 +446,6 @@
    </property>
    <property name="toolTip">
     <string>Close current view</string>
-   </property>
-  </action>
-  <action name="actionFFT">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../resources.qrc">
-     <normaloff>:/icons/fft.png</normaloff>:/icons/fft.png</iconset>
-   </property>
-   <property name="text">
-    <string>FFT</string>
-   </property>
-   <property name="toolTip">
-    <string>Run FFT on current view</string>
-   </property>
-  </action>
-  <action name="actionSRS">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../resources.qrc">
-     <normaloff>:/icons/srs.png</normaloff>:/icons/srs.png</iconset>
-   </property>
-   <property name="text">
-    <string>SRS</string>
-   </property>
-   <property name="toolTip">
-    <string>Run SRS on current view</string>
    </property>
   </action>
   <action name="actionFit_Contents">

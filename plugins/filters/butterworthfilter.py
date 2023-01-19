@@ -9,6 +9,10 @@ from app.plugins.options import DataOption, NumericOption
 
 class ButterworthFilter(dataframeplugins.FilterPlugin):
     @property
+    def name(self) -> str:
+        return "Butterworth Filter"
+
+    @property
     def options(self) -> Dict[str, DataOption]:
         return {
             "low_cutoff": NumericOption("Low Cutoff", 1.0, 0, None),

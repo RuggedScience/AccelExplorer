@@ -1,0 +1,9 @@
+[Core]
+Name = Moving Peak
+Module = movingpeak
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Moving Peak
+Website = N/A

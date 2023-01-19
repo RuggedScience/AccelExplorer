@@ -2,7 +2,7 @@ import logging
 import os
 
 from PySide6.QtWidgets import QApplication
-from yapsy.PluginManager import PluginManager, PluginManagerSingleton
+from yapsy.PluginManager import PluginManager, PluginManagerSingleton, PluginFileLocator
 
 from app.plugins.dataframeplugins import DataFramePlugin
 from app.plugins.parserplugins import ParserPlugin
@@ -20,7 +20,6 @@ QApplication.setApplicationVersion(__version__)
 
 def run():
     plugin_path = get_plugin_path()
-
     pm: PluginManager = PluginManagerSingleton.get()
     pm.setPluginPlaces(
         [
@@ -29,8 +28,7 @@ def run():
             os.path.join(plugin_path, "views"),
         ]
     )
-    pm.setCategoriesFilter(
-        {"parsers": ParserPlugin, "dataframe": DataFramePlugin})
+    pm.setCategoriesFilter({"parsers": ParserPlugin, "dataframe": DataFramePlugin})
     pm.collectPlugins()
 
     app = QApplication([])

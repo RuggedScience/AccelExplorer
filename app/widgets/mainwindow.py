@@ -20,8 +20,14 @@ from PySide6.QtWidgets import (
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
-from app.plugins.dataframeplugins import DataFramePlugin, ViewPlugin, FilterPlugin
-from app.plugins.options import NumericOption, BoolOption
+from app.plugins.dataframeplugins import (
+    DataFramePlugin,
+    ViewPlugin,
+    FilterPlugin,
+    SRSPlugin,
+    FFTPlugin,
+)
+from app.plugins.options import BoolOption
 from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import timing, SignalBlocker
@@ -31,10 +37,12 @@ from app.widgets.parserdialog import ParserDialog
 
 
 class DataframePluginAction(QAction):
-    def __init__(self, plugin: DataFramePlugin, parent: QObject = None):
+    def __init__(
+        self, plugin: DataFramePlugin, description: str = None, parent: QObject = None
+    ):
         super().__init__(plugin.name, parent)
-        self.setToolTip(plugin.description)
-        self._plugin = plugin.plugin_object
+        self.setToolTip(description)
+        self._plugin = plugin
 
     @property
     def plugin(self) -> DataFramePlugin:
@@ -99,8 +107,6 @@ class MainWindow(QMainWindow):
         self.ui.actionClose.triggered.connect(self._close_current_selection)
         self.ui.actionExport.triggered.connect(self._export_current_view)
         self.ui.actionCrop.triggered.connect(self._crop_current_view)
-        self.ui.actionFFT.triggered.connect(self._fft_current_view)
-        self.ui.actionSRS.triggered.connect(self._srs_current_selection)
 
         self.ui.saveDefaults_button.clicked.connect(self._save_chart_settings)
 
@@ -147,14 +153,27 @@ class MainWindow(QMainWindow):
             plugin.plugin_object for plugin in pm.getPluginsOfCategory("parsers")
         ]
 
-        for plugin in pm.getPluginsOfCategory("dataframe"):
-            action = DataframePluginAction(plugin, self)
+        actions = [
+            DataframePluginAction(SRSPlugin(), "Shock Response Spectrum", self),
+            DataframePluginAction(FFTPlugin(), "Fast Fourier Transform", self),
+        ]
+        actions += [
+            DataframePluginAction(plugin.plugin_object, plugin.description, self)
+            for plugin in pm.getPluginsOfCategory("dataframe")
+        ]
+
+        for action in actions:
             action.setEnabled(False)
+            if action.plugin.icon:
+                action.setIcon(action.plugin.icon)
             action.triggered.connect(self._plugin_action_triggered)
             if isinstance(action.plugin, ViewPlugin):
                 self.ui.menuViews.addAction(action)
             elif isinstance(action.plugin, FilterPlugin):
                 self.ui.menuFilters.addAction(action)
+
+            if action.plugin.add_to_toolbar:
+                self.ui.toolBar.addAction(action)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_settings()
@@ -314,91 +333,6 @@ class MainWindow(QMainWindow):
         if controller:
             controller.fit_contents()
 
-    def _fft_current_view(self) -> None:
-        controllers = self.ui.treeWidget.get_selected_controllers()
-        if controllers:
-            options = {
-                "min_freq": NumericOption("Min Freq", 10, 1, None),
-                "max_freq": NumericOption("Max Freq", 1000, 1, None),
-            }
-            # Only add the combine option if we have more than one controller
-            if len(controllers) > 1:
-                options["combine"] = (BoolOption("Combine", True),)
-
-            values = OptionsDialog(options, self).exec()
-            if values:
-                min_x = values.get("min_freq", 10)
-                max_x = values.get("max_freq", 1000)
-                combine = values.get("combine")
-
-                dfs = {}
-                for controller in controllers:
-                    df: pd.DataFrame = ed.calc.fft.fft(controller.df)
-                    # Clamp to min / max values
-                    df = df[(df.index >= min_x) & (df.index <= max_x)]
-                    if combine:
-                        df = df.add_suffix(f" - {controller.name}")
-                        if not dfs:
-                            dfs["FFT"] = df
-                        else:
-                            dfs["FFT"] = pd.concat([dfs["FFT"], df], axis="columns")
-                    else:
-                        dfs[f"FFT - {controller.name}"] = df
-
-                for name, df in dfs.items():
-                    self._add_view(
-                        name,
-                        df,
-                        "Frequency (Hz)",
-                        "Magnitude",
-                    )
-
-    def _srs_current_selection(self) -> None:
-        controllers = self.ui.treeWidget.get_selected_controllers()
-        if controllers:
-            options = {
-                "min_freq": NumericOption("Min Freq", 10, 1, None),
-                "max_freq": NumericOption("Max Freq", 1000, 1, None),
-                "dampening": NumericOption("Dampening", 5, 0, 100),
-            }
-            if len(controllers) > 1:
-                options["combine"] = BoolOption("Combine", True)
-
-            values = OptionsDialog(options, self).exec()
-            if values:
-                min_x = values.get("min_freq", 10)
-                max_x = values.get("max_freq", 1000)
-                dampening = values.get("dampening", 5) / 100
-                combine = values.get("combine")
-
-                dfs = {}
-                for controller in controllers:
-                    df: pd.DataFrame = ed.calc.shock.shock_spectrum(
-                        controller.df,
-                        damp=dampening,
-                        init_freq=min_x,
-                        mode="srs",
-                    )
-                    # Clamp to max value. init_freq parameter will handle min value.
-                    df = df[df.index <= max_x]
-                    if combine:
-                        df = df.add_suffix(f" - {controller.name}")
-                        if not dfs:
-                            dfs["SRS"] = df
-                        else:
-                            dfs["SRS"] = pd.concat([dfs["SRS"], df], axis="columns")
-                    else:
-                        dfs[f"SRS - {controller.name}"] = df
-
-                for name, df in dfs.items():
-                    self._add_view(
-                        name,
-                        df,
-                        "Frequency (Hz)",
-                        "Magnitude",
-                        display_markers=True,
-                    )
-
     def _update_markers(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
@@ -519,11 +453,6 @@ class MainWindow(QMainWindow):
                 enable = False
                 break
 
-        self.ui.actionFFT.setEnabled(enable)
-        self.ui.actionSRS.setEnabled(enable)
-
-        # self._update_series_width()
-
     def _series_legend_clicked(self, series: ViewSeries):
         sender = self.sender()
         if isinstance(sender, ViewController):
@@ -541,20 +470,50 @@ class MainWindow(QMainWindow):
         if files:
             self._add_files([QFileInfo(filename) for filename in files])
 
+    def _view_plugin_triggered(self, plugin: ViewPlugin) -> None:
+        controllers = self.ui.treeWidget.get_selected_controllers()
+
+        options = plugin.options
+        # View plugins support being combined if we have selected more than one controller
+        if len(controllers) > 1:
+            options["combine"] = BoolOption("Combine", True)
+
+        values = OptionsDialog(options, self).exec()
+        if values:
+            combine = values.pop("combine", False)
+            dfs = {}
+            for controller in controllers:
+                df = plugin.process(controller.df, **values)
+                if combine:
+                    df = df.add_suffix(f" - {controller.name}")
+                    if not dfs:
+                        dfs[plugin.name] = df
+                    else:
+                        dfs[plugin.name] = pd.concat(
+                            [dfs[plugin.name], df], axis="columns"
+                        )
+                else:
+                    dfs[f"{plugin.name} - {controller.name}"] = df
+
+            for name, df in dfs.items():
+                self._add_view(
+                    name, df, plugin.x_title, plugin.y_title, plugin.display_markers
+                )
+
+    def _filter_plugin_triggered(self, plugin: FilterPlugin) -> None:
+        controllers = self.ui.treeWidget.get_selected_controllers()
+        if controllers:
+            values = OptionsDialog(plugin.options, self).exec()
+            if values:
+                for controller in controllers:
+                    filtered_df = plugin.process(controller.df, **values)
+                    controller.set_df(filtered_df, plugin.name)
+
     def _plugin_action_triggered(self) -> None:
         sender = self.sender()
-        controller = self.ui.treeWidget.get_current_controller()
-        if controller and isinstance(sender, DataframePluginAction):
-            plugin = sender.plugin
-            options = OptionsDialog(plugin.options, self).exec()
-            if options:
-                df = plugin.process(controller.df, **options)
-                if isinstance(plugin, ViewPlugin):
-                    self._add_view(
-                        f"{sender.text()} - {controller.name}",
-                        df,
-                        plugin.x_title,
-                        plugin.y_title,
-                    )
-                elif isinstance(plugin, FilterPlugin):
-                    controller.set_df(df, f"{sender.text()}")
+
+        if isinstance(sender, DataframePluginAction):
+            if isinstance(sender.plugin, ViewPlugin):
+                self._view_plugin_triggered(sender.plugin)
+            elif isinstance(sender.plugin, FilterPlugin):
+                self._filter_plugin_triggered(sender.plugin)
