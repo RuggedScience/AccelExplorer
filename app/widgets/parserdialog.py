@@ -185,17 +185,15 @@ class ParserDialog(QDialog):
         # Store the current headers. We only want to parse
         # files with the exact same headers.
         headers = None
-        while True:
-            filename = self._current_file
+        current_index = self._file_index
+        for i in range(current_index, len(self._files)):
+            filename = self._files[i]
             if headers is None:
                 headers = set(self._get_headers(filename))
 
             if headers == set(self._get_headers(filename)):
                 if not self._parse(filename):
                     break
-
-            if not self._set_next_file():
-                break
 
         files = set(self._files)
         # Get all remaining files that haven't been parsed
