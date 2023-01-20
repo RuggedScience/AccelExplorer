@@ -20,7 +20,7 @@ class ColorCommand(QUndoCommand):
         super().__init__(f"{series.name} color changed", parent)
 
     def redo(self) -> None:
-        self._series._set_color(self._new_color)
+        self._series.color = self._new_color
 
     def undo(self) -> None:
-        self._series._set_color(self._old_color)
+        self._series.color = self._old_color

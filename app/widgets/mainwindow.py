@@ -1,52 +1,41 @@
+import dataclasses
+import json
 from collections.abc import Iterable
-from typing import List
+from io import TextIOWrapper
 
 import endaq as ed
 import pandas as pd
-from PySide6.QtCore import QFileInfo, QSettings, Qt, QTimer, QObject
+from PySide6.QtCore import QFileInfo, QObject, QSettings, Qt, QTimer
 from PySide6.QtGui import (
+    QAction,
     QCloseEvent,
     QDragEnterEvent,
     QDragMoveEvent,
     QDropEvent,
-    QAction,
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QColorDialog,
     QFileDialog,
     QMainWindow,
     QSpinBox,
-    QColorDialog,
 )
 from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
 from app.plugins.dataframeplugins import (
     DataFramePlugin,
-    ViewPlugin,
+    FFTPlugin,
     FilterPlugin,
     SRSPlugin,
-    FFTPlugin,
+    ViewPlugin,
 )
 from app.plugins.options import BoolOption
 from app.plugins.parserplugins import CSVParser
 from app.ui.ui_mainwindow import Ui_MainWindow
-from app.utils import timing, SignalBlocker
+from app.utils import SignalBlocker, timing
 from app.viewcontroller import ViewController, ViewSeries
 from app.widgets.optionsdialog import OptionsDialog
 from app.widgets.parserdialog import ParserDialog
-
-
-class DataframePluginAction(QAction):
-    def __init__(
-        self, plugin: DataFramePlugin, description: str = None, parent: QObject = None
-    ):
-        super().__init__(plugin.name, parent)
-        self.setToolTip(description)
-        self._plugin = plugin
-
-    @property
-    def plugin(self) -> DataFramePlugin:
-        return self._plugin
 
 
 class MainWindow(QMainWindow):
@@ -70,7 +59,7 @@ class MainWindow(QMainWindow):
         self.ui.menuViews.setEnabled(not self.ui.menuViews.isEmpty())
 
     @property
-    def supported_extensions(self) -> List[str]:
+    def supported_extensions(self) -> list[str]:
         exts = ["ide"]
         for parser in self._parsers:
             exts += [ext.lower() for ext in parser.supported_extensions()]
@@ -149,7 +138,7 @@ class MainWindow(QMainWindow):
     def _load_plugins(self) -> None:
         pm: PluginManager = PluginManagerSingleton.get()
 
-        self._parsers: List[CSVParser] = [
+        self._parsers: list[CSVParser] = [
             plugin.plugin_object for plugin in pm.getPluginsOfCategory("parsers")
         ]
 
@@ -225,15 +214,17 @@ class MainWindow(QMainWindow):
 
         return controller
 
-    def _add_file(self, fileinfo: QFileInfo | str, df: pd.DataFrame) -> None:
+    def _add_file(
+        self, fileinfo: QFileInfo | str, df: pd.DataFrame, x_title: str, y_title: str
+    ) -> ViewController:
         if isinstance(fileinfo, str):
             fileinfo = QFileInfo(fileinfo)
 
         controller = self._add_view(
             fileinfo.fileName(),
             df,
-            df.index.name,
-            "Acceleration (g's)",
+            x_title,
+            y_title,
         )
         # Set the original filename in the tooltip
         # in case the user changes the name later.
@@ -242,40 +233,44 @@ class MainWindow(QMainWindow):
             freq = 1 / ed.calc.utils.sample_spacing(df)
             tooltip_text += f"\nFrequency: {freq:.2f}hz"
         controller.tree_item.setToolTip(0, tooltip_text)
+        return controller
 
     def _add_files(self, files: Iterable[QFileInfo]) -> None:
         unparsed_files = []
         for file in files:
             df = None
             filename = file.absoluteFilePath()
-            if file.suffix().lower() == "ide":
+            extension = file.suffix().lower()
+            if extension == "ide":
                 df: pd.DataFrame = ed.ide.get_primary_sensor_data(
                     name=filename, measurement_type=ed.ide.ACCELERATION
                 )
                 # Convert index from datetime to timedelta
                 series = df.index.to_series()
                 df.index = series - series[0]
+            elif extension == "csv" and self._parse_exported_file(filename):
+                pass
             else:
-                df = None
                 for parser in self._parsers:
-                    try:
-                        df = parser.parse(filename)
-                        break
-                    except Exception as ex:
-                        pass
+                    if extension in parser.supported_extensions():
+                        try:
+                            df = parser.parse(filename)
+                            break
+                        except Exception as ex:
+                            pass
 
-            if df is not None:
-                self._add_file(file, df)
-            else:
-                unparsed_files.append(filename)
+                if df is not None:
+                    self._add_file(file, df, df.index.name, "Acceleration (g's)")
+                else:
+                    unparsed_files.append(filename)
 
         if unparsed_files:
             dfs = ParserDialog(unparsed_files, self).exec()
             if dfs:
                 for file, df in dfs.items():
-                    self._add_file(file, df)
+                    self._add_file(file, df, df.index.name, "Acceleration (g's)")
 
-    def _get_supported_files(self, event: QDropEvent) -> List[QFileInfo]:
+    def _get_supported_files(self, event: QDropEvent) -> list[QFileInfo]:
         files = []
         mimeData = event.mimeData()
         if mimeData.hasUrls():
@@ -321,7 +316,10 @@ class MainWindow(QMainWindow):
                 self, "Export File", suggested_name, "CSV (*.csv)"
             )
             if fileName:
-                controller.df.to_csv(fileName)
+                with open(fileName, "w") as f:
+                    metadata = ViewMetaData.from_controller(controller)
+                    metadata.to_file(f)
+                    controller.df.to_csv(f)
 
     def _crop_current_view(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -446,7 +444,7 @@ class MainWindow(QMainWindow):
         self.ui.actionCrop.setEnabled(enable)
         self.ui.menuData.setEnabled(enable)
 
-    def _selection_changed(self, controllers: List[ViewController]) -> None:
+    def _selection_changed(self, controllers: list[ViewController]) -> None:
         enable = bool(controllers)
         for controller in controllers:
             if controller.df.index.inferred_type != "timedelta64":
@@ -517,3 +515,123 @@ class MainWindow(QMainWindow):
                 self._view_plugin_triggered(sender.plugin)
             elif isinstance(sender.plugin, FilterPlugin):
                 self._filter_plugin_triggered(sender.plugin)
+
+    def _parse_exported_file(self, filename) -> bool:
+        with open(filename, "r") as f:
+            metadata = ViewMetaData.from_file(f)
+            if metadata:
+                parse_dates = bool(metadata.index_type == "timedelta64")
+                df = pd.read_csv(f, index_col=metadata.index_name)
+
+                if parse_dates:
+                    df.index = pd.to_timedelta(df.index, unit=None)
+
+                controller = self._add_file(
+                    filename, df, metadata.x_title, metadata.y_title
+                )
+                metadata.to_controller(controller)
+                return True
+
+        return False
+
+
+class DataframePluginAction(QAction):
+    def __init__(
+        self, plugin: DataFramePlugin, description: str = None, parent: QObject = None
+    ):
+        super().__init__(plugin.name, parent)
+        self.setToolTip(description)
+        self._plugin = plugin
+
+    @property
+    def plugin(self) -> DataFramePlugin:
+        return self._plugin
+
+
+@dataclasses.dataclass
+class ViewMetaData:
+    start_string = "#AccelExplorer MetaData\n"
+    end_string = "#End AccelExplorer Metadata\n"
+
+    index_name: str
+    index_type: str
+
+    x_title: str
+    x_major_ticks: int
+    x_minor_ticks: int
+
+    y_title: str
+    y_major_ticks: int
+    y_minor_ticks: int
+
+    series_width: int
+
+    display_markers: bool
+    marker_size: int
+    marker_count: int
+
+    series: dict[str, dict]
+
+    def to_controller(self, controller: ViewController) -> None:
+        controller.x_axis.setTitleText(self.x_title)
+        controller.x_axis.setMinorTickCount(self.x_minor_ticks)
+        controller.x_axis.setTickCount(self.x_major_ticks)
+        controller.y_axis.setTitleText(self.y_title)
+        controller.y_axis.setMinorTickCount(self.y_major_ticks)
+        controller.y_axis.setTickCount(self.y_minor_ticks)
+        controller.series_width = self.series_width
+        controller.marker_count = self.marker_count
+        controller.marker_size = self.marker_size
+        controller.display_markers = self.display_markers
+        for series, data in self.series.items():
+            if series in controller:
+                controller[series].color = data["color"]
+                controller[series].marker_shape = data["shape"]
+
+    def to_file(self, file: TextIOWrapper) -> None:
+        file.write(self.start_string)
+        json.dump(dataclasses.asdict(self), file)
+        file.write("\n")
+        file.write(self.end_string)
+
+    @classmethod
+    def from_controller(cls, controller: ViewController) -> "ViewMetaData":
+        kwargs = {
+            "index_name": controller.df.index.name,
+            "index_type": controller.df.index.inferred_type,
+            "x_title": controller.x_axis.titleText(),
+            "x_minor_ticks": controller.x_axis.minorTickCount(),
+            "x_major_ticks": controller.x_axis.tickCount(),
+            "y_title": controller.y_axis.titleText(),
+            "y_minor_ticks": controller.y_axis.minorTickCount(),
+            "y_major_ticks": controller.y_axis.tickCount(),
+            "series_width": controller.series_width,
+            "display_markers": controller.display_markers,
+            "marker_size": controller.marker_size,
+            "marker_count": controller.marker_count,
+            "series": {
+                series.name: {
+                    "color": series.color.name(),
+                    "shape": series.marker_shape.value,
+                }
+                for series in controller
+            },
+        }
+        return cls(**kwargs)
+
+    @classmethod
+    def from_file(cls, file: TextIOWrapper) -> "ViewMetaData":
+        data = ""
+        for i, line in enumerate(file):
+            if i == 0:
+                if line == cls.start_string:
+                    continue
+                else:
+                    return None
+            elif line == cls.end_string:
+                break
+
+            data += line
+
+        kwargs = json.loads(data)
+        return cls(**kwargs)

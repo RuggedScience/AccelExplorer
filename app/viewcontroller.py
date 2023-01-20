@@ -16,7 +16,7 @@ from app.commands.viewcommands import (
     RenameSeriesCommand,
 )
 from app.utils import df_to_points, SignalBlocker
-from app.utils.markergenerator import MarkerGenerator
+from app.utils.markergenerator import MarkerGenerator, MarkerShape
 from app.widgets.interactivechart import InteractiveChart
 from app.widgets.colorwidget import ColorWidget
 
@@ -36,6 +36,7 @@ class ViewSeries(QObject):
         self._chart_series = QLineSeries()
         self._chart_series.colorChanged.connect(self._color_changed)
 
+        self._color_widget = None
         self._tree_item = QTreeWidgetItem(parent_item)
         if self._tree_item.treeWidget():
             self._color_widget = ColorWidget(QColor())
@@ -45,11 +46,22 @@ class ViewSeries(QObject):
             )
 
         self._name = ""
-        self._rename(name)
+        self._marker_shape = None
+
+        self.name = name
+        self.marker_size = 15
+        self._update_marker_image()
 
     @property
     def name(self) -> str:
         return self._name
+
+    @name.setter
+    def name(self, name: str) -> None:
+        if self._name != name:
+            self._name = name
+            self._tree_item.setText(0, name)
+            self._chart_series.setName(name)
 
     @property
     def chart_series(self) -> QLineSeries:
@@ -81,6 +93,14 @@ class ViewSeries(QObject):
     def color(self) -> QColor:
         return self._chart_series.color()
 
+    @color.setter
+    def color(self, color: QColor | str) -> None:
+        if isinstance(color, str):
+            color = QColor.fromString(color)
+
+        if color != self._chart_series.color():
+            self._chart_series.setColor(color)
+
     @property
     def width(self) -> int:
         return self._chart_series.pen().width()
@@ -91,17 +111,41 @@ class ViewSeries(QObject):
         pen.setWidth(width)
         self._chart_series.setPen(pen)
 
-    def _rename(self, name: str) -> None:
-        if self._name != name:
-            self._name = name
-            self._tree_item.setText(0, name)
-            self._chart_series.setName(name)
+    @property
+    def marker_shape(self) -> MarkerShape:
+        return self._marker_shape
 
-    def _set_color(self, color: QColor) -> None:
-        self._chart_series.setColor(color)
+    @marker_shape.setter
+    def marker_shape(self, shape: MarkerShape | int) -> None:
+        if isinstance(shape, int):
+            shape = MarkerShape(shape)
+
+        if shape != self._marker_shape:
+            self._marker_shape = shape
+            self._update_marker_image()
+
+    @property
+    def marker_size(self) -> float:
+        return self._chart_series.markerSize()
+
+    @marker_size.setter
+    def marker_size(self, size: float) -> None:
+        if size != self._chart_series.markerSize():
+            self._chart_series.setMarkerSize(size)
+
+    def _update_marker_image(self) -> None:
+        if self._marker_shape is None:
+            self._chart_series.setSelectedLightMarker(QImage())
+            # pass
+        else:
+            self._chart_series.setSelectedLightMarker(
+                MarkerGenerator.get_marker(self._marker_shape, 50, self.color)
+            )
 
     def _color_changed(self, color: QColor) -> None:
-        self._color_widget.color = color
+        if self._color_widget:
+            self._color_widget.color = color
+        self._update_marker_image()
 
 
 class ViewController(QObject):
@@ -123,7 +167,7 @@ class ViewController(QObject):
         self._marker_size = 10
         self._marker_count = 5
         self._display_markers = display_markers
-        self._marker_generator = MarkerGenerator(50)
+        self._marker_generator = MarkerGenerator()
 
         self._tree_item = QTreeWidgetItem(tree_widget)
         self._undo_stack = QUndoStack(self)
@@ -237,12 +281,7 @@ class ViewController(QObject):
     def display_markers(self, display: bool):
         if self._display_markers != display:
             self._display_markers = display
-            self._marker_generator.reset()
-            for series in self._view_series.values():
-                self._update_series_markers(series.chart_series)
-
-            if display:
-                self._update_marker_points()
+            self._update_marker_points()
 
     @property
     def marker_size(self) -> int:
@@ -252,9 +291,8 @@ class ViewController(QObject):
     def marker_size(self, size: int) -> None:
         if self._marker_size != size:
             self._marker_size = size
-            if self._display_markers:
-                for series in self._view_series.values():
-                    series.chart_series.setMarkerSize(size)
+            for series in self._view_series.values():
+                series.marker_size = size
 
     @property
     def marker_count(self) -> int:
@@ -405,7 +443,7 @@ class ViewController(QObject):
     def _rename_series(self, series: ViewSeries, name: str) -> None:
         self._df = self._df.rename(columns={series.name: name})
         with SignalBlocker(self._tree_item.treeWidget()):
-            series._rename(name)
+            series.name = name
 
     def _point_hovered(self, pos: QPointF, state: bool) -> None:
         if state:
@@ -420,6 +458,9 @@ class ViewController(QObject):
 
     def _add_series(self, name: str) -> ViewSeries:
         view_series = ViewSeries(name, self._tree_item, self)
+        view_series.marker_shape = self._marker_generator.next_shape()
+        view_series.marker_size = self._marker_size
+
         view_series.legend_clicked.connect(self._legend_clicked)
 
         chart_series = view_series.chart_series
@@ -435,8 +476,6 @@ class ViewController(QObject):
 
         view_series.width = self._series_width
         self._view_series[tree_item] = view_series
-
-        self._update_series_markers(chart_series)
 
         return view_series
 
@@ -480,16 +519,12 @@ class ViewController(QObject):
             if points is not None:
                 view_series.points = points
 
-    def _update_series_markers(self, series: QLineSeries) -> None:
-        if not self._display_markers:
-            series.setMarkerSize(0)
-            series.setSelectedLightMarker(QImage())
-            series.deselectAllPoints()
-        else:
-            series.setMarkerSize(self._marker_size)
-            series.setSelectedLightMarker(self._marker_generator.next(series.color()))
-
     def _update_marker_points(self) -> None:
+        if not self._display_markers:
+            for series in self:
+                series.chart_series.deselectAllPoints()
+            return
+
         start = self._x_axis.min()
         end = self._x_axis.max()
 

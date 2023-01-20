@@ -54,7 +54,7 @@ class CSVParser(ParserPlugin):
         df.dropna(axis="columns", how="all", inplace=True)
         for col in df:
             if not pd.api.types.is_numeric_dtype(df[col]):
-                raise ValueError()
+                raise ValueError("All columns must be numeric")
 
         if df.empty:
             raise ParseError("No numeric data found")
@@ -69,9 +69,6 @@ class CSVParser(ParserPlugin):
             time_units = index_type
             if index_type == "timestamp":
                 time_units = None
-
-                # if start_time != 0:
-                # df.index = df.index - start_time
             df.index = pd.to_timedelta(df.index, unit=time_units)
 
             start_time = df.index[0]

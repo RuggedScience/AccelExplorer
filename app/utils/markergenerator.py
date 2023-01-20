@@ -1,25 +1,26 @@
+from enum import IntEnum, auto
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPainter, QPainterPath, qRgba
 
 
+class MarkerShape(IntEnum):
+    SQUARE = auto()
+    TRIANGLE = auto()
+    CIRCLE = auto()
+
+
 class MarkerGenerator:
-    def __init__(self, size: int = 15):
-        self.size = size
+    def __init__(self):
+        self._current_shape = 0
 
-        self._index = 0
-        self._functions = [
-            MarkerGenerator.square,
-            MarkerGenerator.triangle,
-            MarkerGenerator.circle,
-        ]
+    def next_shape(self) -> MarkerShape:
+        try:
+            self._current_shape = MarkerShape(self._current_shape + 1)
+        except ValueError:
+            self._current_shape = MarkerShape(1)
 
-    def next(self, color) -> None:
-        if self._index >= len(self._functions):
-            self._index = 0
-
-        f = self._functions[self._index]
-        self._index += 1
-        return f(self.size, color)
+        return self._current_shape
 
     def reset(self) -> None:
         self._index = 0
@@ -29,6 +30,15 @@ class MarkerGenerator:
         image = QImage(size, size, QImage.Format.Format_ARGB32)
         image.fill(qRgba(0, 0, 0, 0))
         return image
+
+    @staticmethod
+    def get_marker(shape: MarkerShape, size: int, color) -> QImage:
+        if shape == MarkerShape.SQUARE:
+            return MarkerGenerator.square(size, color)
+        if shape == MarkerShape.TRIANGLE:
+            return MarkerGenerator.triangle(size, color)
+        if shape == MarkerShape.CIRCLE:
+            return MarkerGenerator.circle(size, color)
 
     @staticmethod
     def square(size: int, color) -> QImage:
