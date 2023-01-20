@@ -108,7 +108,9 @@ class CSVViewer(QPlainTextEdit):
             self.updateLineNumberAreaWidth(0)
 
     def _handle_cursor_changed(self) -> None:
-        line_number = self._getLineNumber()
+        cursor = self.textCursor()
+
+        line_number = cursor.blockNumber() + 1
         if line_number == self._line_number:
             return
 
@@ -119,14 +121,23 @@ class CSVViewer(QPlainTextEdit):
 
         selection.format.setBackground(lineColor)
         selection.format.setProperty(QTextFormat.FullWidthSelection, True)
-        selection.cursor = self.textCursor()
 
-        selection.cursor.clearSelection()
+        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+        cursor.movePosition(
+            QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor
+        )
+        # Select one extra character to allow the full line to be highlighted
+        cursor.movePosition(
+            QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor
+        )
+
+        selection.cursor = cursor
+
         extraSelections.append(selection)
 
         self.setExtraSelections(extraSelections)
         self._line_number = line_number
-        self.lineNumberChanged.emit(self._line_number)
+        self.lineNumberChanged.emit(line_number)
 
     def resizeEvent(self, e: QResizeEvent) -> None:
         super().resizeEvent(e)
@@ -135,23 +146,3 @@ class CSVViewer(QPlainTextEdit):
         self._lineNumberArea.setGeometry(
             QRect(cr.left(), cr.top(), self.lineNumberAreaWidth(), cr.height())
         )
-
-    def _getLineNumber(self) -> int:
-        cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.StartOfLine)
-        lines = 0
-
-        lines_text = cursor.block().text().splitlines()
-        lines_pos = 0
-        for line_text in lines_text:
-            lines_pos += len(line_text) + 1
-            if lines_pos > cursor.position() - cursor.block().position():
-                break
-            lines += 1
-
-        block = cursor.block().previous()
-        while block.isValid():
-            lines += block.lineCount()
-            block = block.previous()
-
-        return lines + 1
