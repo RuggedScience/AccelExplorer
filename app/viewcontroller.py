@@ -30,7 +30,7 @@ class ViewSeries(QObject):
         self,
         name: str,
         parent_item: QTreeWidgetItem = None,
-        parent: QObject = None,
+        parent: "ViewController" = None,
     ) -> None:
         super().__init__(parent)
         self._chart_series = QLineSeries()
@@ -51,6 +51,10 @@ class ViewSeries(QObject):
         self.name = name
         self.marker_size = 15
         self._update_marker_image()
+
+    @property
+    def controller(self) -> "ViewController":
+        return self.parent()
 
     @property
     def name(self) -> str:
@@ -107,6 +111,7 @@ class ViewSeries(QObject):
 
     @width.setter
     def width(self, width: int) -> None:
+        print(f"Setting series width to {width}")
         pen = self._chart_series.pen()
         pen.setWidth(width)
         self._chart_series.setPen(pen)
@@ -457,7 +462,7 @@ class ViewController(QObject):
             self.chart_view.tooltip.hide()
 
     def _add_series(self, name: str) -> ViewSeries:
-        view_series = ViewSeries(name, self._tree_item, self)
+        view_series = ViewSeries(name, self._tree_item, parent=self)
         view_series.marker_shape = self._marker_generator.next_shape()
         view_series.marker_size = self._marker_size
 

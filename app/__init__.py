@@ -21,6 +21,7 @@ QApplication.setApplicationVersion(__version__)
 def run():
     plugin_path = get_plugin_path()
     pm: PluginManager = PluginManagerSingleton.get()
+    pm.setPluginInfoExtension("plugin")
     pm.setPluginPlaces(
         [
             os.path.join(plugin_path, "parsers"),

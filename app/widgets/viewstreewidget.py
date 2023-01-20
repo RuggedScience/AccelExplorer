@@ -10,7 +10,7 @@ from app.viewcontroller import ViewController, ViewSeries
 class ViewsTreeWidget(QTreeWidget):
     currentViewChanged = Signal(ViewController, ViewController)
     viewSelectionChanged = Signal(list)
-    seriesHovered = Signal(ViewController, ViewSeries, ViewSeries)
+    seriesHovered = Signal(ViewSeries, ViewSeries)
 
     def __init__(self, parent: Optional[QWidget] = ...) -> None:
         super().__init__(parent)
@@ -89,7 +89,7 @@ class ViewsTreeWidget(QTreeWidget):
                 new_series = controller[item]
 
         if new_series != self._hovered_series:
-            self.seriesHovered.emit(controller, new_series, self._hovered_series)
+            self.seriesHovered.emit(new_series, self._hovered_series)
             self._hovered_series = new_series
 
         return super().mouseMoveEvent(event)

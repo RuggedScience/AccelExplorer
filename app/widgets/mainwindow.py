@@ -24,9 +24,7 @@ from yapsy.PluginManager import PluginManager, PluginManagerSingleton
 
 from app.plugins.dataframeplugins import (
     DataFramePlugin,
-    FFTPlugin,
     FilterPlugin,
-    SRSPlugin,
     ViewPlugin,
 )
 from app.plugins.options import BoolOption
@@ -142,16 +140,10 @@ class MainWindow(QMainWindow):
             plugin.plugin_object for plugin in pm.getPluginsOfCategory("parsers")
         ]
 
-        actions = [
-            DataframePluginAction(SRSPlugin(), "Shock Response Spectrum", self),
-            DataframePluginAction(FFTPlugin(), "Fast Fourier Transform", self),
-        ]
-        actions += [
-            DataframePluginAction(plugin.plugin_object, plugin.description, self)
-            for plugin in pm.getPluginsOfCategory("dataframe")
-        ]
-
-        for action in actions:
+        for plugin in pm.getPluginsOfCategory("dataframe"):
+            action = DataframePluginAction(
+                plugin.plugin_object, plugin.description, self
+            )
             action.setEnabled(False)
             if action.plugin.icon:
                 action.setIcon(action.plugin.icon)
@@ -359,18 +351,17 @@ class MainWindow(QMainWindow):
     def _update_series_width(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
-            for series in controller:
-                series.width = self.ui.seriesWidth_spin.value()
+            controller.series_width = self.ui.seriesWidth_spin.value()
 
-    def _handle_series_hovered(
-        self, controller: ViewController, current: ViewSeries, previous: ViewSeries
-    ) -> None:
+    def _handle_series_hovered(self, current: ViewSeries, previous: ViewSeries) -> None:
         if previous:
-            previous.width = self.ui.seriesWidth_spin.value()
+            previous.width = previous.controller.series_width
 
-        if controller and controller is self.ui.treeWidget.get_current_controller():
-            if current:
-                current.width = self.ui.selectedSeriesWidth_spin.value()
+        if (
+            current
+            and current.controller is self.ui.treeWidget.get_current_controller()
+        ):
+            current.width = self.ui.selectedSeriesWidth_spin.value()
 
     def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
         if not spin_box.hasFocus():
@@ -429,14 +420,6 @@ class MainWindow(QMainWindow):
             self.ui.stackedWidget.setCurrentWidget(current.chart_view)
             self.ui.undoView.setStack(current.undo_stack)
 
-            for action in self.ui.menuViews.actions():
-                if isinstance(action, DataframePluginAction):
-                    action.setEnabled(action.plugin.can_process(current.df))
-
-            for action in self.ui.menuFilters.actions():
-                if isinstance(action, DataframePluginAction):
-                    action.setEnabled(action.plugin.can_process(current.df))
-
         enable = current is not None
         self.ui.actionFit_Contents.setEnabled(enable)
         self.ui.actionClose.setEnabled(enable)
@@ -445,11 +428,15 @@ class MainWindow(QMainWindow):
         self.ui.menuData.setEnabled(enable)
 
     def _selection_changed(self, controllers: list[ViewController]) -> None:
-        enable = bool(controllers)
-        for controller in controllers:
-            if controller.df.index.inferred_type != "timedelta64":
-                enable = False
-                break
+        actions = self.ui.menuViews.actions() + self.ui.menuFilters.actions()
+        for action in actions:
+            if isinstance(action, DataframePluginAction):
+                can_process = bool(controllers)
+                for controller in controllers:
+                    if not action.plugin.can_process(controller.df):
+                        can_process = False
+                        break
+                action.setEnabled(can_process)
 
     def _series_legend_clicked(self, series: ViewSeries):
         sender = self.sender()

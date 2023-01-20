@@ -1,0 +1,9 @@
+[Core]
+Name = FFT
+Module = fft
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Fast Fourier Transform
+Website = N/A
