@@ -111,7 +111,6 @@ class ViewSeries(QObject):
 
     @width.setter
     def width(self, width: int) -> None:
-        print(f"Setting series width to {width}")
         pen = self._chart_series.pen()
         pen.setWidth(width)
         self._chart_series.setPen(pen)
@@ -161,7 +160,7 @@ class ViewController(QObject):
         name: str,
         df: pd.DataFrame,
         display_markers: bool = False,
-        tree_widget: QTreeWidget = None,
+        parent_item: QTreeWidget | QTreeWidgetItem = None,
         parent: QObject = None,
     ):
         super().__init__(parent)
@@ -174,7 +173,7 @@ class ViewController(QObject):
         self._display_markers = display_markers
         self._marker_generator = MarkerGenerator()
 
-        self._tree_item = QTreeWidgetItem(tree_widget)
+        self._tree_item = QTreeWidgetItem(parent_item)
         self._undo_stack = QUndoStack(self)
         self._chart_view = InteractiveChart()
         self._chart_view.chart().legend().hide()

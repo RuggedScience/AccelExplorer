@@ -2,11 +2,12 @@ import pandas as pd
 
 from app.plugins import dataframeplugins
 from app.plugins.options import DataOption, NumericOption
+from app.utils import classproperty
 
 
 class MovingPeak(dataframeplugins.ViewPlugin):
-    @property
-    def name(self) -> str:
+    @classproperty
+    def name(cls) -> str:
         return "Moving Peak"
 
     @property
@@ -17,16 +18,19 @@ class MovingPeak(dataframeplugins.ViewPlugin):
     def y_title(self) -> str:
         return "Acceleration (g)"
 
-    @property
-    def options(self) -> dict[str, DataOption]:
+    @classproperty
+    def options(cls) -> dict[str, DataOption]:
         return {
             "steps": NumericOption("Steps", 100, 1, None),
         }
 
-    def can_process(self, df: pd.DataFrame) -> bool:
-        return True
+    @classmethod
+    def can_process(cls, df: pd.DataFrame) -> bool:
+        return df is not None
 
-    def process(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def process(self, **kwargs) -> pd.DataFrame:
+        df = self._df
+
         steps = kwargs.get("steps", 100)
         n = int(df.shape[0] / steps)
         return df.abs().rolling(n).max().iloc[::n]

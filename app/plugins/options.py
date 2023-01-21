@@ -1,7 +1,5 @@
-from collections import namedtuple
 from dataclasses import dataclass
 from numbers import Number
-from typing import List
 
 
 @dataclass
@@ -16,13 +14,20 @@ class NumericOption(DataOption):
     max: Number
 
 
-ListOptionPair = namedtuple("ListOptionPair", ["name", "value"])
+@dataclass
+class ListOptionPair:
+    name: str
+    value: str
 
 
 @dataclass
 class ListOption(DataOption):
+    options: list[ListOptionPair]
 
-    options: List[ListOptionPair]
+    def value_to_name(self, value: str) -> str:
+        for option in self.options:
+            if option.value == value:
+                return option.name
 
 
 @dataclass

@@ -5,19 +5,21 @@ from PySide6.QtGui import QIcon
 
 from app.plugins import dataframeplugins
 from app.plugins.options import DataOption, NumericOption
+from app.utils import classproperty
 
 
 class SRSPlugin(dataframeplugins.ViewPlugin):
-    @property
-    def name(self) -> str:
+    @classproperty
+    def name(cls) -> str:
         return "SRS"
 
-    @property
-    def icon(self) -> str | QIcon:
-        return QIcon(":/icons/srs.png")
+    @classproperty
+    def icon(cls) -> str | QIcon:
+        return None
+        # return QIcon(":/icons/srs.png")
 
-    @property
-    def add_to_toolbar(self) -> bool:
+    @classproperty
+    def add_to_toolbar(cls) -> bool:
         return True
 
     @property
@@ -28,27 +30,28 @@ class SRSPlugin(dataframeplugins.ViewPlugin):
     def y_title(self) -> str:
         return "Magnitude"
 
-    @property
+    @classproperty
     def display_markers(self) -> bool:
         return True
 
-    @property
-    def options(self) -> dict[str, DataOption]:
+    @classproperty
+    def options(cls) -> dict[str, DataOption]:
         return {
             "min_freq": NumericOption("Min Freq", 10, 1, None),
             "max_freq": NumericOption("Max Freq", 1000, 1, None),
             "dampening": NumericOption("Dampening", 5, 0, 100),
         }
 
-    def can_process(self, df: pd.DataFrame) -> bool:
+    @classmethod
+    def can_process(cls, df: pd.DataFrame) -> bool:
         return df.index.inferred_type == "timedelta64"
 
-    def process(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def process(self, **kwargs) -> pd.DataFrame:
         min_x = kwargs.get("min_freq", 10)
         max_x = kwargs.get("max_freq", 1000)
         dampening = kwargs.get("dampening", 5) / 100
         srs: pd.DataFrame = ed.calc.shock.shock_spectrum(
-            df,
+            self._df,
             damp=dampening,
             init_freq=min_x,
             mode="srs",

@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import os
 from collections.abc import Iterable
 from io import TextIOWrapper
 
@@ -19,18 +20,19 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
     QSpinBox,
+    QTreeWidgetItem,
 )
-from yapsy.PluginManager import PluginManager, PluginManagerSingleton
+from yapsy.PluginManager import PluginManager
 
 from app.plugins.dataframeplugins import (
     DataFramePlugin,
     FilterPlugin,
     ViewPlugin,
 )
-from app.plugins.options import BoolOption
-from app.plugins.parserplugins import CSVParser
+from app.plugins.options import BoolOption, ListOption
+from app.plugins.parserplugins import ParserPlugin
 from app.ui.ui_mainwindow import Ui_MainWindow
-from app.utils import SignalBlocker, timing
+from app.utils import SignalBlocker, timing, get_plugin_path
 from app.viewcontroller import ViewController, ViewSeries
 from app.widgets.optionsdialog import OptionsDialog
 from app.widgets.parserdialog import ParserDialog
@@ -134,9 +136,20 @@ class MainWindow(QMainWindow):
         )
 
     def _load_plugins(self) -> None:
-        pm: PluginManager = PluginManagerSingleton.get()
+        plugin_path = get_plugin_path()
+        pm = PluginManager()
+        pm.setPluginInfoExtension("plugin")
+        pm.setPluginPlaces(
+            [
+                os.path.join(plugin_path, "parsers"),
+                os.path.join(plugin_path, "filters"),
+                os.path.join(plugin_path, "views"),
+            ]
+        )
+        pm.setCategoriesFilter({"parsers": ParserPlugin, "dataframe": DataFramePlugin})
+        pm.collectPlugins()
 
-        self._parsers: list[CSVParser] = [
+        self._parsers: list[ParserPlugin] = [
             plugin.plugin_object for plugin in pm.getPluginsOfCategory("parsers")
         ]
 
@@ -167,13 +180,14 @@ class MainWindow(QMainWindow):
         x_title: str,
         y_title: str,
         display_markers: bool = False,
+        parent_item: QTreeWidgetItem = None,
     ) -> ViewController:
         controller = ViewController(
             name,
             df,
             display_markers=display_markers,
-            tree_widget=self.ui.treeWidget,
-            parent=self,
+            parent_item=self.ui.treeWidget,
+            parent=parent_item or self,
         )
         controller.x_axis.setTitleText(x_title)
         controller.y_axis.setTitleText(y_title)
@@ -294,6 +308,12 @@ class MainWindow(QMainWindow):
 
     def _close_current_selection(self) -> None:
         controllers = self.ui.treeWidget.get_selected_controllers()
+        # If there is no selection, close the current view
+        if not controllers:
+            current_controller = self.ui.treeWidget.get_current_controller()
+            if current_controller:
+                controllers = [current_controller]
+
         for controller in controllers:
             self.ui.treeWidget.remove_view(controller)
             self.ui.stackedWidget.removeWidget(controller.chart_view)
@@ -357,10 +377,7 @@ class MainWindow(QMainWindow):
         if previous:
             previous.width = previous.controller.series_width
 
-        if (
-            current
-            and current.controller is self.ui.treeWidget.get_current_controller()
-        ):
+        if current:
             current.width = self.ui.selectedSeriesWidth_spin.value()
 
     def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
@@ -463,36 +480,83 @@ class MainWindow(QMainWindow):
         if len(controllers) > 1:
             options["combine"] = BoolOption("Combine", True)
 
-        values = OptionsDialog(options, self).exec()
-        if values:
-            combine = values.pop("combine", False)
-            dfs = {}
-            for controller in controllers:
-                df = plugin.process(controller.df, **values)
-                if combine:
-                    df = df.add_suffix(f" - {controller.name}")
-                    if not dfs:
-                        dfs[plugin.name] = df
-                    else:
-                        dfs[plugin.name] = pd.concat(
-                            [dfs[plugin.name], df], axis="columns"
-                        )
-                else:
-                    dfs[f"{plugin.name} - {controller.name}"] = df
+        if options:
+            values = OptionsDialog(options, self).exec()
+            if not values:
+                return
+        else:
+            values = {}
 
-            for name, df in dfs.items():
-                self._add_view(
-                    name, df, plugin.x_title, plugin.y_title, plugin.display_markers
+        new_controllers = []
+        combine = values.pop("combine", False)
+        if combine:
+            combined_df = None
+            for controller in controllers:
+                df = controller.df.add_suffix(f" - {controller.name}")
+                plugin.set_df(df)
+                df = plugin.process(**values)
+
+                if combined_df is None:
+                    combined_df = df
+                else:
+                    combined_df = pd.concat([combined_df, df], axis="columns")
+
+            controller = self._add_view(
+                plugin.name,
+                combined_df,
+                plugin.x_title,
+                plugin.y_title,
+                plugin.display_markers,
+            )
+            new_controllers.append(controller)
+        else:
+            for controller in controllers:
+                plugin.set_df(controller.df)
+                df = plugin.process(**values)
+                controller = self._add_view(
+                    f"{plugin.name} - {controller.name}",
+                    df,
+                    plugin.x_title,
+                    plugin.y_title,
+                    plugin.display_markers,
                 )
+                new_controllers.append(controller)
+
+        tooltip = ""
+        for key, option in options.items():
+            if key in values:
+                value = values[key]
+                if isinstance(option, ListOption):
+                    value = option.value_to_name(value)
+                tooltip += f"{option.name}: {value}\n"
+        tooltip = tooltip.rstrip()
+
+        for controller in new_controllers:
+            controller.tree_item.setToolTip(0, tooltip)
 
     def _filter_plugin_triggered(self, plugin: FilterPlugin) -> None:
         controllers = self.ui.treeWidget.get_selected_controllers()
         if controllers:
-            values = OptionsDialog(plugin.options, self).exec()
-            if values:
-                for controller in controllers:
-                    filtered_df = plugin.process(controller.df, **values)
-                    controller.set_df(filtered_df, plugin.name)
+            options = plugin.options
+            if options:
+                values = OptionsDialog(options, self).exec()
+                if not values:
+                    return
+            else:
+                values = {}
+
+            for controller in controllers:
+                plugin.set_df(controller.df)
+                filtered_df = plugin.process(**values)
+                title = f"{plugin.name} ("
+                for key, option in options.items():
+                    if key in values:
+                        value = values[key]
+                        if isinstance(option, ListOption):
+                            value = option.value_to_name(value)
+                        title += f" {option.name}: {value}"
+                title += ")"
+                controller.set_df(filtered_df, title)
 
     def _plugin_action_triggered(self) -> None:
         sender = self.sender()

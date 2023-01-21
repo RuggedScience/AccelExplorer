@@ -1,0 +1,9 @@
+[Core]
+Name = PSD
+Module = psd
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Power Spectral Density
+Website = N/A

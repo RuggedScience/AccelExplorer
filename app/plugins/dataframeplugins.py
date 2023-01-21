@@ -1,38 +1,46 @@
 from abc import ABC, abstractmethod
 
-import endaq as ed
 import pandas as pd
 from yapsy.IPlugin import IPlugin
 
 from PySide6.QtGui import QIcon
 
-from .options import DataOption, NumericOption
+from app.utils import classproperty
+from .options import DataOption
 
 
 class DataFramePlugin(IPlugin, ABC):
-    @property
+    def __init__(self):
+        self._df = None
+        super().__init__()
+
+    @classproperty
     @abstractmethod
-    def name(self) -> str:
+    def name(cls) -> str:
         pass
 
-    @property
-    def icon(self) -> str | QIcon:
+    @classproperty
+    def icon(cls) -> str | QIcon:
         return None
 
-    @property
-    def add_to_toolbar(self) -> bool:
+    @classproperty
+    def add_to_toolbar(cls) -> bool:
         return False
 
-    @property
-    def options(self) -> dict[str, DataOption]:
+    @classproperty
+    def options(cls) -> dict[str, DataOption]:
         return {}
 
+    @classmethod
     @abstractmethod
-    def can_process(self, df: pd.DataFrame) -> bool:
+    def can_process(cls, df: pd.DataFrame) -> bool:
         pass
 
+    def set_df(self, df: pd.DataFrame):
+        self._df = df
+
     @abstractmethod
-    def process(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    def process(self, **kwargs) -> pd.DataFrame:
         pass
 
 
@@ -53,6 +61,6 @@ class ViewPlugin(DataFramePlugin):
     def y_title(self) -> str:
         pass
 
-    @property
+    @classproperty
     def display_markers(self) -> bool:
         return False
