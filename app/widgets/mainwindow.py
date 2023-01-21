@@ -117,10 +117,13 @@ class MainWindow(QMainWindow):
 
         self.ui.selectedSeriesWidth_spin.setValue(self._selected_series_width)
 
+        self._last_directory = settings.value("last_directory", "")
+
     def _save_settings(self) -> None:
         settings = QSettings()
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("state", self.saveState())
+        settings.setValue("last_directory", self._last_directory)
 
     def _save_chart_settings(self):
         settings = QSettings()
@@ -324,10 +327,13 @@ class MainWindow(QMainWindow):
         if controller:
             item = controller.tree_item
             suggested_name = item.text(0).split(".")[0]
+            if self._last_directory:
+                suggested_name = os.path.join(self._last_directory, suggested_name)
             fileName, filter = QFileDialog.getSaveFileName(
                 self, "Export File", suggested_name, "CSV (*.csv)"
             )
             if fileName:
+                self._last_directory = os.path.dirname(fileName)
                 with open(fileName, "w") as f:
                     metadata = ViewMetaData.from_controller(controller)
                     metadata.to_file(f)
@@ -468,8 +474,14 @@ class MainWindow(QMainWindow):
             filters += f"*.{ext} "
         filters = filters.strip() + ")"
 
-        files, _ = QFileDialog.getOpenFileNames(self, "Select Files", "", filters)
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Files",
+            self._last_directory,
+            filters,
+        )
         if files:
+            self._last_directory = os.path.dirname(files[0])
             self._add_files([QFileInfo(filename) for filename in files])
 
     def _view_plugin_triggered(self, plugin: ViewPlugin) -> None:
