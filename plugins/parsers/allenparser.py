@@ -1,7 +1,6 @@
 __all__ = ["AllenCSVParser"]
 
 import linecache
-from typing import Dict
 
 import pandas as pd
 

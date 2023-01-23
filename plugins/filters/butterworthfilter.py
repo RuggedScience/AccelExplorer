@@ -23,7 +23,7 @@ class ButterworthFilter(dataframeplugins.FilterPlugin):
                     ListOptionPair("Low Pass", "low_pass"),
                 ],
             ),
-            "cutoff": NumericOption("Cutoff", 1, 1, None),
+            "cutoff": NumericOption("Cutoff (Hz)", 1, 1, None),
             "half_order": NumericOption("Half Order", 3, 0, None),
         }
 

@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
 
     @property
     def supported_extensions(self) -> list[str]:
-        exts = ["ide"]
+        exts = []
         for parser in self._parsers:
             exts += [ext.lower() for ext in parser.supported_extensions()]
 
@@ -250,15 +250,8 @@ class MainWindow(QMainWindow):
             df = None
             filename = file.absoluteFilePath()
             extension = file.suffix().lower()
-            if extension == "ide":
-                df: pd.DataFrame = ed.ide.get_primary_sensor_data(
-                    name=filename, measurement_type=ed.ide.ACCELERATION
-                )
-                # Convert index from datetime to timedelta
-                series = df.index.to_series()
-                df.index = series - series[0]
-            elif extension == "csv" and self._parse_exported_file(filename):
-                pass
+            if extension == "csv" and self._parse_exported_file(filename):
+                continue
             else:
                 for parser in self._parsers:
                     if extension in parser.supported_extensions():
@@ -268,10 +261,10 @@ class MainWindow(QMainWindow):
                         except Exception as ex:
                             pass
 
-                if df is not None:
-                    self._add_file(file, df, df.index.name, "Acceleration (g's)")
-                else:
-                    unparsed_files.append(filename)
+            if df is not None:
+                self._add_file(file, df, df.index.name, "Acceleration (g's)")
+            else:
+                unparsed_files.append(filename)
 
         if unparsed_files:
             dfs = ParserDialog(unparsed_files, self).exec()
@@ -566,7 +559,10 @@ class MainWindow(QMainWindow):
                         value = values[key]
                         if isinstance(option, ListOption):
                             value = option.value_to_name(value)
-                        title += f" {option.name}: {value}"
+                        title += f" {option.name}: {value},"
+
+                # Remove trailing comma
+                title = title[:-1]
                 title += ")"
                 controller.set_df(filtered_df, title)
 

@@ -1,6 +1,6 @@
 import os
+from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import List
 
 import pandas as pd
 from yapsy.IPlugin import IPlugin
@@ -16,12 +16,17 @@ class ParserPlugin(IPlugin, ABC):
 
     @staticmethod
     @abstractmethod
-    def supported_extensions() -> List[str]:
+    def supported_extensions() -> tuple[str]:
         pass
 
-    @abstractmethod
-    def can_parse(self, filename: str) -> bool:
-        pass
+    @classmethod
+    def can_parse(cls, filename: str) -> bool:
+        path = Path(filename)
+        return (
+            path.exists()
+            and path.is_file()
+            and path.suffix in cls.supported_extensions()
+        )
 
     @abstractmethod
     def parse(self, filename: str, **kwargs) -> pd.DataFrame:
@@ -30,8 +35,8 @@ class ParserPlugin(IPlugin, ABC):
 
 class CSVParser(ParserPlugin):
     @staticmethod
-    def supported_extensions() -> List[str]:
-        return ["csv"]
+    def supported_extensions() -> tuple[str]:
+        return ("csv",)
 
     def can_parse(self, filename: str) -> bool:
         return os.path.exists(filename)
