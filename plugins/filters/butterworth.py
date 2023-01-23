@@ -1,5 +1,3 @@
-from collections.abc import Iterable
-
 import endaq as ed
 import pandas as pd
 

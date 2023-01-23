@@ -62,5 +62,5 @@ class ViewPlugin(DataFramePlugin):
         pass
 
     @classproperty
-    def display_markers(self) -> bool:
+    def display_markers(cls) -> bool:
         return False

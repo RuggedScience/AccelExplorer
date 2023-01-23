@@ -1,0 +1,9 @@
+[Core]
+Name = Bessel Filter
+Module = bessel
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Low pass / high pass filtering using the Bessel algorithm
+Website = N/A
