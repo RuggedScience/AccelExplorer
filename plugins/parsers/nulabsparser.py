@@ -2,11 +2,8 @@ __all__ = ["NULabsCSVParser"]
 
 import linecache
 
-from typing import Dict
-
-import pandas as pd
-
 from app.plugins import parserplugins
+from app.views import ViewModel
 
 
 class NULabsCSVParser(parserplugins.CSVParser):
@@ -17,10 +14,11 @@ class NULabsCSVParser(parserplugins.CSVParser):
             return False
         return True
 
-    def parse(self, filename: str) -> pd.DataFrame:
+    def parse(self, filename: str) -> ViewModel:
         sample_rate = self._get_sample_rate(filename)
-        df = super().parse(filename, sample_rate=sample_rate, header_row=16)
-        return df.iloc[:, 1:]
+        df = self._parse_to_df(filename=filename, sample_rate=sample_rate, header_row=16)
+        df = df.iloc[:, 1:]
+        return ViewModel(df, "Acceleration (g)")
 
     def _get_sample_rate(self, filename: str) -> int:
         sample_rate_row = linecache.getline(filename, 8).lower()

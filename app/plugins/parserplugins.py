@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from yapsy.IPlugin import IPlugin
 
+from app.views import ViewModel
+
 
 class ParseError(Exception):
     pass
@@ -29,7 +31,7 @@ class ParserPlugin(IPlugin, ABC):
         )
 
     @abstractmethod
-    def parse(self, filename: str, **kwargs) -> pd.DataFrame:
+    def parse(self, filename: str, **kwargs) -> ViewModel:
         pass
 
 
@@ -40,9 +42,9 @@ class CSVParser(ParserPlugin):
 
     def can_parse(self, filename: str) -> bool:
         return os.path.exists(filename)
-
-    def parse(
-        self,
+    
+    def _parse_to_df(
+        self, 
         filename: str,
         header_row: int = 1,
         index_type: str = None,
@@ -83,3 +85,13 @@ class CSVParser(ParserPlugin):
             df.index.rename("Time (s)", inplace=True)
 
         return df
+
+    def parse(
+        self,
+        filename: str,
+        x_axis_title = "",
+        y_axis_title = "",
+        **kwargs,
+    ) -> ViewModel:
+        df = self._parse_to_df(filename=filename, **kwargs)
+        return ViewModel(df, y_axis_title)

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QCheckBox, QDialog, QMessageBox, QWidget
 
 from app.plugins.parserplugins import CSVParser, ParseError
 from app.ui.ui_parserdialog import Ui_Dialog
+from app.views import ViewModel
 
 
 class ParserDialog(QDialog):
@@ -25,7 +26,7 @@ class ParserDialog(QDialog):
         self.ui.setupUi(self)
 
         self._column_checkboxes: dict[str, QCheckBox] = {}
-        self._dfs: dict[str, pd.DataFrame] = {}
+        self._models: dict[str, ViewModel] = {}
         self._skipped_files = set()
 
         self.ui.headerRowSpinBox.valueChanged.connect(self._headerRowChanged)
@@ -147,8 +148,9 @@ class ParserDialog(QDialog):
             index_type = self.ui.indexTypeComboBox.currentText()
 
         try:
-            self._dfs[filename] = parser.parse(
+            self._models[filename] = parser.parse(
                 filename,
+                y_axis_title=self.ui.yAxisLineEdit.text(),
                 header_row=header_row,
                 usecols=usecols,
                 index_col=index,
@@ -197,7 +199,7 @@ class ParserDialog(QDialog):
 
         files = set(self._files)
         # Get all remaining files that haven't been parsed
-        unparsed_files = files.difference(set(self._dfs.keys()))
+        unparsed_files = files.difference(set(self._models.keys()))
         # Remove files the user skipped
         unparsed_files = unparsed_files.difference(self._skipped_files)
 
@@ -206,9 +208,9 @@ class ParserDialog(QDialog):
         else:
             self.accept()
 
-    def exec(self) -> pd.DataFrame:
-        self._dfs.clear()
+    def exec(self) -> dict[str, ViewModel]:
+        self._models.clear()
         self.ui.finish_button.setDisabled(True)
         ret = super().exec()
         if ret:
-            return self._dfs.copy()
+            return self._models.copy()

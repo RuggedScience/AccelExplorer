@@ -48,24 +48,24 @@
           </property>
          </widget>
         </item>
-        <item row="1" column="0">
+        <item row="2" column="0">
          <widget class="QLabel" name="label_2">
           <property name="text">
            <string>X-Axis</string>
           </property>
          </widget>
         </item>
-        <item row="1" column="1">
+        <item row="2" column="1">
          <widget class="QComboBox" name="indexComboBox"/>
         </item>
-        <item row="2" column="0">
+        <item row="3" column="0">
          <widget class="QLabel" name="label_3">
           <property name="text">
            <string>Type</string>
           </property>
          </widget>
         </item>
-        <item row="2" column="1">
+        <item row="3" column="1">
          <widget class="QComboBox" name="indexTypeComboBox">
           <property name="enabled">
            <bool>false</bool>
@@ -102,14 +102,14 @@
           </item>
          </widget>
         </item>
-        <item row="3" column="0">
+        <item row="4" column="0">
          <widget class="QLabel" name="label_4">
           <property name="text">
            <string>Sample Rate</string>
           </property>
          </widget>
         </item>
-        <item row="3" column="1">
+        <item row="4" column="1">
          <widget class="QSpinBox" name="sampleRateSpinBox">
           <property name="enabled">
            <bool>false</bool>
@@ -119,6 +119,20 @@
           </property>
           <property name="maximum">
            <number>999999999</number>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="yAxisLineEdit">
+          <property name="text">
+           <string>Acceleration (g)</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="yAxisLabel">
+          <property name="text">
+           <string>Y-Axis</string>
           </property>
          </widget>
         </item>
@@ -160,7 +174,7 @@
              <x>0</x>
              <y>0</y>
              <width>231</width>
-             <height>124</height>
+             <height>152</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="headerLayout">

@@ -234,7 +234,7 @@ class MainWindow(QMainWindow):
     def _add_files(self, files: Iterable[QFileInfo]) -> None:
         unparsed_files = []
         for file in files:
-            df = None
+            model = None
             filename = file.absoluteFilePath()
             extension = file.suffix().lower()
             if extension == "csv" and self._parse_exported_file(filename):
@@ -243,22 +243,20 @@ class MainWindow(QMainWindow):
                 for parser in self._parsers:
                     if extension in parser.supported_extensions():
                         try:
-                            df = parser.parse(filename)
+                            model = parser.parse(filename)
                             break
                         except Exception as ex:
                             pass
 
-            if df is not None:
-                model = ViewModel(df, "Acceleration (g)")
+            if model is not None:
                 self._add_file(file, model)
             else:
                 unparsed_files.append(filename)
 
         if unparsed_files:
-            dfs = ParserDialog(unparsed_files, self).exec()
-            if dfs:
-                for file, df in dfs.items():
-                    model = ViewModel(df, "Acceleration (g)")
+            models = ParserDialog(unparsed_files, self).exec()
+            if models:
+                for file, model in models.items():
                     self._add_file(file, model)
 
     def _get_supported_files(self, event: QDropEvent) -> list[QFileInfo]:
