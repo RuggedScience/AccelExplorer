@@ -40,6 +40,11 @@ class ViewModel(QObject):
     def empty(self) -> bool:
         return self._df.empty
 
+    @property
+    def sample_rate(self) -> float:
+        if self._df.index.inferred_type == "timedelta64":
+            return 1 / sample_spacing(self._df)
+
     def copy(self) -> "ViewModel":
         return ViewModel(self._df, self._points)
 

@@ -1,6 +1,4 @@
-from typing import List
-
-from PySide6.QtCharts import QChartView, QChart
+from PySide6.QtCharts import QChartView
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import (
     QCursor,
@@ -9,7 +7,7 @@ from PySide6.QtGui import (
     QResizeEvent,
     QWheelEvent,
 )
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 
 from .callout import Callout
 
@@ -20,13 +18,13 @@ def control_pressed() -> bool:
 
 
 class InteractiveChart(QChartView):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, parent: QWidget = None) -> None:
+        super().__init__(parent)
         self.setRubberBand(
             QChartView.HorizontalRubberBand | QChartView.ClickThroughRubberBand
         )
 
-        self._callouts: List[Callout] = []
+        self._callouts: list[Callout] = []
 
         self._tool_tip = self.add_callout(QPointF(0, 0), "")
         self._tool_tip.hide()
