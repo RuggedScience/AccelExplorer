@@ -18,6 +18,8 @@ class PSDPlugin(viewmodelplugin.ViewPlugin):
     @property
     def options(self) -> dict[str, DataOption]:
         return {
+            "min_freq": NumericOption("Min Freq", 10, 1, None),
+            "max_freq": NumericOption("Max Freq", 1000, 1, None),
             "bin_width": NumericOption("Bin Width", 1, 1, None),
             "scaling": ListOption(
                 "Scaling",
@@ -30,12 +32,21 @@ class PSDPlugin(viewmodelplugin.ViewPlugin):
         }
 
     def can_process(self, model: ViewModel) -> bool:
-        return model.index_type in ("timedelta64", )
+        return model.index_type in ("timedelta64",)
 
     def process(self, model: ViewModel, **kwargs) -> ViewModel:
-        df = ed.endaq.calc.psd.welch(model.df, **kwargs)
+        min_x = kwargs.pop("min_freq", 10)
+        max_x = kwargs.pop("max_freq", 1000)
+
+        psd = ed.endaq.calc.psd.welch(model.df, **kwargs)
+        psd = psd[(psd.index >= min_x) & (psd.index <= max_x)]
         y_axis = model.y_axis
+
+        # PSD results in the same y-axis units but squared per Hz.
+        # Find the closing parentheses that contains the unit and add "^2/Hz" to it.
+        # Example: "Acceleration (g)" becomes "Acceleration (g^2/Hz)""
         index = y_axis.rfind(")")
         if index > 0:
-            y_axis = f"{y_axis[:index]}**2/Hz)"
-        return ViewModel(df, y_axis=y_axis)
+            y_axis = f"{y_axis[:index]}^2/Hz)"
+
+        return ViewModel(psd, y_axis=y_axis)

@@ -224,11 +224,7 @@ class MainWindow(QMainWindow):
         controller = self._add_view(fileinfo.fileName(), model)
         # Set the original filename in the tooltip
         # in case the user changes the name later.
-        tooltip_text = f"File: {fileinfo.fileName()}"
-        if model.index_type == "timedelta64":
-            freq = model.sample_rate
-            tooltip_text += f"\nFrequency: {freq:.2f}hz"
-        controller.tree_item.setToolTip(0, tooltip_text)
+        controller.add_tooltips(f"File: {fileinfo.fileName()}")
         return controller
 
     def _add_files(self, files: Iterable[QFileInfo]) -> None:
@@ -522,7 +518,7 @@ class MainWindow(QMainWindow):
         else:
             values = {}
 
-        new_controllers = []
+        new_controllers: list[ViewController] = []
         combine = values.pop("combine", False)
         if combine:
             combined_model = ViewModel()
@@ -530,7 +526,7 @@ class MainWindow(QMainWindow):
                 model = plugin.process(controller.model, **values)
                 model.add_suffix(f" - {controller.name}")
                 combined_model.merge(model)
-                
+
             controller = self._add_view(
                 plugin.name,
                 combined_model,
@@ -547,17 +543,16 @@ class MainWindow(QMainWindow):
                 )
                 new_controllers.append(controller)
 
-        tooltip = ""
+        tooltips = []
         for key, option in options.items():
             if key in values:
                 value = values[key]
                 if isinstance(option, ListOption):
                     value = option.value_to_name(value)
-                tooltip += f"{option.name}: {value}\n"
-        tooltip = tooltip.rstrip()
+                tooltips.append(f"{option.name}: {value}")
 
         for controller in new_controllers:
-            controller.tree_item.setToolTip(0, tooltip)
+            controller.add_tooltips(tooltips)
 
     def _filter_plugin_triggered(self, plugin: FilterPlugin) -> None:
         controllers = self.ui.treeWidget.get_selected_controllers()

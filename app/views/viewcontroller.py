@@ -183,6 +183,7 @@ class ViewController(QObject):
         super().__init__(parent)
         self._name = None
         self._model = None
+        self._tooltip_lines = []
         self._view_series: dict[QTreeWidgetItem, ViewSeries] = {}
 
         self._series_width = 1
@@ -261,14 +262,26 @@ class ViewController(QObject):
     @undoable("model", title_arg="title", remove_title_arg=True)
     def set_model(self, model: ViewModel) -> None:
         if self._model is not None:
-            self._model.data_changed.disconnect(self._data_changed)
+            self._model.disconnect(self)
 
         self._model = model
         if self._model is not None:
+            self._model.series_added.connect(self._add_series)
+            self._model.series_removed.connect(self._remove_series)
             self._model.data_changed.connect(self._data_changed)
+            # self._model.sample_rate_changed.connect(self._update_tooltip)
 
+        self._update_tooltip()
+        self._sync_series_to_model()
         self._data_changed()
         self.fit_contents()
+
+    def add_tooltips(self, tooltips: str | list[str]):
+        if isinstance(tooltips, str):
+            tooltips = [tooltips]
+
+        self._tooltip_lines += tooltips
+        self._update_tooltip()
 
     def set_item_parent(self, parent: QTreeWidget | QTreeWidgetItem) -> None:
         old_parent = self._tree_item.parent() or self._tree_item.treeWidget()
@@ -396,7 +409,7 @@ class ViewController(QObject):
             return
 
         # Create a dataframe with only the visible data
-        df = self.df[cols]
+        df = self.model.df[cols]
         # Drop rows missing all data. This gives us accurate
         # min/max values for our visible series.
         df = df.dropna(how="all")
@@ -448,6 +461,8 @@ class ViewController(QObject):
         tree_item.setCheckState(0, Qt.Checked)
 
         view_series.width = self._series_width
+        view_series.points = self.model.points[name]
+
         self._view_series[tree_item] = view_series
 
         return view_series
@@ -467,7 +482,7 @@ class ViewController(QObject):
         self._view_series.pop(view_series.tree_item)
         view_series.deleteLater()
 
-    def _update_series(self) -> None:
+    def _sync_series_to_model(self) -> None:
         df = self._model.df
         new_names = {str(col) for col in df}
         old_names = {s.name for s in self._view_series.values()}
@@ -481,15 +496,16 @@ class ViewController(QObject):
         for name in added_cols:
             self._add_series(name)
 
+    def _update_tooltip(self) -> None:
+        lines = self._tooltip_lines.copy()
+        lines.append(f"Points: {self.model.shape[0]:n}")
+        if self.model.sample_rate:
+            lines.append(f"Sample Rate: {int(self.model.sample_rate):n}hz")
+
+        self._tree_item.setToolTip(0, "\n".join(lines))
+
     def _data_changed(self) -> None:
-        self._update_series()
-
-        all_points = self._model.points
-        for view_series in self._view_series.values():
-            points = all_points.get(view_series.name)
-            if points is not None:
-                view_series.points = points
-
+        self._update_tooltip()
         # Use OpenGL with larger datasets
         use_opengl = self.model.size > 50000
         for series in self:
