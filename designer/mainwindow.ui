@@ -136,7 +136,11 @@
          </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QSpinBox" name="yMajorTicks_spin"/>
+         <widget class="QSpinBox" name="yMajorTicks_spin">
+          <property name="minimum">
+           <number>2</number>
+          </property>
+         </widget>
         </item>
         <item row="2" column="0">
          <widget class="QLabel" name="label_5">
@@ -199,7 +203,11 @@
          </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QSpinBox" name="xMajorTicks_spin"/>
+         <widget class="QSpinBox" name="xMajorTicks_spin">
+          <property name="minimum">
+           <number>2</number>
+          </property>
+         </widget>
         </item>
         <item row="2" column="0">
          <widget class="QLabel" name="label_7">
@@ -387,7 +395,15 @@
     <addaction name="menuViews"/>
     <addaction name="menuFilters"/>
    </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionUndo"/>
+    <addaction name="actionRedo"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
    <addaction name="menuView"/>
    <addaction name="menuData"/>
   </widget>
@@ -445,7 +461,7 @@
     <string>Close</string>
    </property>
    <property name="toolTip">
-    <string>Close current view</string>
+    <string>Close all selected views</string>
    </property>
   </action>
   <action name="actionFit_Contents">
@@ -460,7 +476,29 @@
     <string>Fit Contents</string>
    </property>
    <property name="toolTip">
-    <string>Fit data within view</string>
+    <string>Zoom to data on current view</string>
+   </property>
+  </action>
+  <action name="actionUndo">
+   <property name="text">
+    <string>Undo</string>
+   </property>
+   <property name="toolTip">
+    <string>Undo last action in current view</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Z</string>
+   </property>
+  </action>
+  <action name="actionRedo">
+   <property name="text">
+    <string>Redo</string>
+   </property>
+   <property name="toolTip">
+    <string>Redo last action in current view</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Y</string>
    </property>
   </action>
  </widget>

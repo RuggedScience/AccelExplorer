@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
     QSpinBox,
-    QTreeWidgetItem,
 )
 from yapsy.PluginManager import PluginManager
 
@@ -96,6 +95,8 @@ class MainWindow(QMainWindow):
         self.ui.actionClose.triggered.connect(self._close_current_selection)
         self.ui.actionExport.triggered.connect(self._export_current_view)
         self.ui.actionCrop.triggered.connect(self._crop_current_view)
+        self.ui.actionUndo.triggered.connect(self._undo)
+        self.ui.actionRedo.triggered.connect(self._redo)
 
         self.ui.saveDefaults_button.clicked.connect(self._save_chart_settings)
 
@@ -183,20 +184,18 @@ class MainWindow(QMainWindow):
         x_title: str,
         y_title: str,
         display_markers: bool = False,
-        parent_item: QTreeWidgetItem = None,
     ) -> ViewController:
         controller = ViewController(
             name,
             ViewModel(df),
             display_markers=display_markers,
             item_parent=self.ui.treeWidget,
-            parent=parent_item or self,
+            parent=self,
         )
         controller.x_axis.setTitleText(x_title)
         controller.y_axis.setTitleText(y_title)
 
         tree_item = controller.tree_item
-        tree_item.setFlags(tree_item.flags() | Qt.ItemIsAutoTristate)
 
         if len(controller.chart.series()) > 1:
             tree_item.setExpanded(True)
@@ -341,6 +340,25 @@ class MainWindow(QMainWindow):
         if controller:
             controller.fit_contents()
 
+    def _undo(self) -> None:
+        controller = self.ui.treeWidget.get_current_controller()
+        if controller and controller.undo_stack.canUndo():
+            controller.undo_stack.undo()
+
+    def _redo(self) -> None:
+        controller = self.ui.treeWidget.get_current_controller()
+        if controller and controller.undo_stack.canRedo():
+            controller.undo_stack.redo()
+
+    def _update_undo_actions(self) -> None:
+        controller = self.ui.treeWidget.get_current_controller()
+        self.ui.actionUndo.setEnabled(
+            bool(controller and controller.undo_stack.canUndo())
+        )
+        self.ui.actionRedo.setEnabled(
+            bool(controller and controller.undo_stack.canRedo())
+        )
+
     def _update_markers(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         if controller:
@@ -416,6 +434,7 @@ class MainWindow(QMainWindow):
             y_axis = previous.y_axis
             x_axis.disconnect(self)
             y_axis.disconnect(self)
+            previous.undo_stack.disconnect(self)
 
         self.ui.chartSettingsWidget.setEnabled((current != None))
 
@@ -432,6 +451,9 @@ class MainWindow(QMainWindow):
             y_axis.tickCountChanged.connect(self._update_chart_settings)
             y_axis.minorTickCountChanged.connect(self._update_chart_settings)
 
+            current.undo_stack.canUndoChanged.connect(self._update_undo_actions)
+            current.undo_stack.canRedoChanged.connect(self._update_undo_actions)
+
             self.ui.stackedWidget.setCurrentWidget(current.chart_view)
             self.ui.undoView.setStack(current.undo_stack)
 
@@ -441,6 +463,8 @@ class MainWindow(QMainWindow):
         self.ui.actionExport.setEnabled(enable)
         self.ui.actionCrop.setEnabled(enable)
         self.ui.menuData.setEnabled(enable)
+
+        self._update_undo_actions()
 
     def _selection_changed(self, controllers: list[ViewController]) -> None:
         actions = self.ui.menuViews.actions() + self.ui.menuFilters.actions()
@@ -612,6 +636,7 @@ class ViewMetaData:
     start_string = "#AccelExplorer MetaData\n"
     end_string = "#End AccelExplorer Metadata\n"
 
+    name: str
     index_name: str
     index_type: str
 
@@ -632,6 +657,7 @@ class ViewMetaData:
     series: dict[str, dict]
 
     def to_controller(self, controller: ViewController) -> None:
+        controller.set_name(self.name, undo=False)
         controller.x_axis.setTitleText(self.x_title)
         controller.x_axis.setMinorTickCount(self.x_minor_ticks)
         controller.x_axis.setTickCount(self.x_major_ticks)
@@ -656,6 +682,7 @@ class ViewMetaData:
     @classmethod
     def from_controller(cls, controller: ViewController) -> "ViewMetaData":
         kwargs = {
+            "name": controller.name,
             "index_name": controller.df.index.name,
             "index_type": controller.df.index.inferred_type,
             "x_title": controller.x_axis.titleText(),

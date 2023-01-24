@@ -213,14 +213,6 @@ class ViewController(QObject):
         self.chart.addAxis(self._x_axis, Qt.AlignBottom)
         self.chart.addAxis(self._y_axis, Qt.AlignLeft)
 
-        undo_action = self._undo_stack.createUndoAction(self._chart_view)
-        undo_action.setShortcut(QKeySequence.Undo)
-
-        redo_action = self._undo_stack.createRedoAction(self._chart_view)
-        redo_action.setShortcut(QKeySequence.Redo)
-
-        self._chart_view.addActions([undo_action, redo_action])
-
         self.set_item_parent(item_parent)
         self.set_model(model, undo=False)
         self.set_name(name, undo=False)
@@ -323,7 +315,7 @@ class ViewController(QObject):
         return self._model.df
 
     @property
-    def undo_stack(self) -> None:
+    def undo_stack(self) -> QUndoStack:
         return self._undo_stack
 
     @property
