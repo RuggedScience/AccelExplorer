@@ -200,6 +200,9 @@ class ViewController(QObject):
         self._x_axis = QValueAxis()
         self._y_axis = QValueAxis()
 
+        self._x_axis.setTitleText(model.x_axis)
+        self._y_axis.setTitleText(model.y_axis)
+
         self.chart.addAxis(self._x_axis, Qt.AlignBottom)
         self.chart.addAxis(self._y_axis, Qt.AlignLeft)
 

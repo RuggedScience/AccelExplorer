@@ -180,20 +180,16 @@ class MainWindow(QMainWindow):
     def _add_view(
         self,
         name: str,
-        df: pd.DataFrame,
-        x_title: str,
-        y_title: str,
+        model: ViewModel,
         display_markers: bool = False,
     ) -> ViewController:
         controller = ViewController(
             name,
-            ViewModel(df),
+            model,
             display_markers=display_markers,
             item_parent=self.ui.treeWidget,
             parent=self,
         )
-        controller.x_axis.setTitleText(x_title)
-        controller.y_axis.setTitleText(y_title)
 
         tree_item = controller.tree_item
 
@@ -221,23 +217,16 @@ class MainWindow(QMainWindow):
 
         return controller
 
-    def _add_file(
-        self, fileinfo: QFileInfo | str, df: pd.DataFrame, x_title: str, y_title: str
-    ) -> ViewController:
+    def _add_file(self, fileinfo: QFileInfo | str, model: ViewModel) -> ViewController:
         if isinstance(fileinfo, str):
             fileinfo = QFileInfo(fileinfo)
 
-        controller = self._add_view(
-            fileinfo.fileName(),
-            df,
-            x_title,
-            y_title,
-        )
+        controller = self._add_view(fileinfo.fileName(), model)
         # Set the original filename in the tooltip
         # in case the user changes the name later.
         tooltip_text = f"File: {fileinfo.fileName()}"
-        if df.index.inferred_type == "timedelta64":
-            freq = 1 / ed.calc.utils.sample_spacing(df)
+        if model.index_type == "timedelta64":
+            freq = model.sample_rate
             tooltip_text += f"\nFrequency: {freq:.2f}hz"
         controller.tree_item.setToolTip(0, tooltip_text)
         return controller
@@ -260,7 +249,8 @@ class MainWindow(QMainWindow):
                             pass
 
             if df is not None:
-                self._add_file(file, df, df.index.name, "Acceleration (g's)")
+                model = ViewModel(df, "Acceleration (g)")
+                self._add_file(file, model)
             else:
                 unparsed_files.append(filename)
 
@@ -268,7 +258,8 @@ class MainWindow(QMainWindow):
             dfs = ParserDialog(unparsed_files, self).exec()
             if dfs:
                 for file, df in dfs.items():
-                    self._add_file(file, df, df.index.name, "Acceleration (g's)")
+                    model = ViewModel(df, "Acceleration (g)")
+                    self._add_file(file, model)
 
     def _get_supported_files(self, event: QDropEvent) -> list[QFileInfo]:
         files = []
@@ -547,11 +538,10 @@ class MainWindow(QMainWindow):
                 else:
                     combined_df = pd.concat([combined_df, df], axis="columns")
 
+            model = ViewModel(combined_df, plugin.y_title)
             controller = self._add_view(
                 plugin.name,
-                combined_df,
-                plugin.x_title,
-                plugin.y_title,
+                model,
                 plugin.display_markers,
             )
             new_controllers.append(controller)
@@ -559,11 +549,10 @@ class MainWindow(QMainWindow):
             for controller in controllers:
                 plugin.set_df(controller.df)
                 df = plugin.process(**values)
+                model = ViewModel(df, plugin.y_title)
                 controller = self._add_view(
                     f"{plugin.name} - {controller.name}",
-                    df,
-                    plugin.x_title,
-                    plugin.y_title,
+                    model,
                     plugin.display_markers,
                 )
                 new_controllers.append(controller)
@@ -627,9 +616,8 @@ class MainWindow(QMainWindow):
                 if parse_dates:
                     df.index = pd.to_timedelta(df.index, unit=None)
 
-                controller = self._add_file(
-                    filename, df, metadata.x_title, metadata.y_title
-                )
+                model = ViewModel(df, metadata.y_title)
+                controller = self._add_file(filename, model)
                 metadata.to_controller(controller)
                 return True
 

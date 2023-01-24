@@ -10,19 +10,25 @@ class ViewModel(QObject):
     data_changed = Signal()
     series_added = Signal(str)
     series_removed = Signal(str)
+    name_changed = Signal(str, str)
 
     def __init__(
         self,
         df: pd.DataFrame = pd.DataFrame(),
+        y_axis: str = "",
         points: dict[str, QPointFList] = None,
         parent: QObject = None,
+        lazy: bool = True
     ):
         super().__init__(parent)
 
         self._df = df.copy()
+        self._y_axis = y_axis
+        self._points = None
 
         if points is None:
-            self._points = self.generate_points(df)
+            if not lazy:
+                self._points = self.generate_points(df)
         else:
             self._points = points.copy()
 
@@ -43,12 +49,27 @@ class ViewModel(QObject):
         return self._df.copy()
     
     @property
+    def x_axis(self) -> str:
+        return self._df.index.name
+    
+    @property
+    def y_axis(self) -> str:
+        return self._y_axis
+    
+    @property
     def size(self) -> int:
         return self._df.size
     
+    @property
+    def index_type(self) -> str:
+        return self._df.index.inferred_type
 
     @property
     def points(self) -> dict[str, QPointFList]:
+        # Lazyily generate the points
+        if self._points is None:
+            self._points = self.generate_points(self._df)
+
         return self._points.copy()
 
     @property
@@ -61,7 +82,7 @@ class ViewModel(QObject):
             return 1 / sample_spacing(self._df)
 
     def copy(self) -> "ViewModel":
-        return ViewModel(self._df, self._points)
+        return ViewModel(df=self._df, y_axis=self._y_axis, points=self._points)
 
     def remove_series(self, name: str) -> None:
         assert name in self._df
@@ -76,18 +97,25 @@ class ViewModel(QObject):
     def merge(self, other: "ViewModel") -> None:
         if not self.can_merge(other):
             raise ValueError("Cannot merge non matching models")
-
+        
         new_cols = set(other._df.columns).difference(self._df)
-        for col in new_cols:
-            self._df[col] = other._df[col].copy()
-            self._points[col] = other._points[col]
+        
+        if self.empty:
+            self._df = other._df
+            self._points = other._points
+            self._y_axis = other._y_axis
+        else:
+            for col in new_cols:
+                self._df[col] = other._df[col].copy()
+                self._points[col] = other._points[col]
 
-        # df = pd.concat([self._df, other], axis="columns")
-        self._df.sort_index(inplace=True)
+            # df = pd.concat([self._df, other], axis="columns")
+            self._df.sort_index(inplace=True)
 
-        # Wait until we're done to end the signals
+        # Wait until we're done to emit the signals
         for col in new_cols:
             self.series_added.emit(col)
+        self.data_changed.emit()
 
     def can_merge(self, other: "ViewModel") -> bool:
         if self.empty:
@@ -109,6 +137,7 @@ class ViewModel(QObject):
         self._df.rename(columns=columns, inplace=True)
         for old, new in columns.items():
             self._points[new] = self._points.pop(old)
+            self.name_changed.emit(old, new)
 
     @staticmethod
     def generate_points(df: pd.DataFrame) -> dict[str, QPointFList]:
