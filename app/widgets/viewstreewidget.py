@@ -1,18 +1,25 @@
 from typing import Optional
 
-import pandas as pd
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QDragEnterEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QMouseEvent,
+)
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget, QStyle
 
-from PySide6.QtCore import Qt, Signal, QChildEvent
-from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
-
-from app.views import ViewController, ViewSeries, ViewModel
+from app.views import ViewController, ViewModel, ViewSeries
 
 
 class ViewsTreeWidget(QTreeWidget):
     currentViewChanged = Signal(ViewController, ViewController)
     viewSelectionChanged = Signal(list)
     seriesHovered = Signal(ViewSeries, ViewSeries)
+
+    current_view_color = QColor(235, 177, 133)
 
     def __init__(self, parent: Optional[QWidget] = ...) -> None:
         super().__init__(parent)
@@ -32,6 +39,7 @@ class ViewsTreeWidget(QTreeWidget):
 
         self._drag_model = None
         self._hovered_series = None
+        self._current_controller = None
 
     def add_view(self, controller: ViewController) -> None:
         items = [controller.tree_item] + [view.tree_item for view in controller]
@@ -43,19 +51,6 @@ class ViewsTreeWidget(QTreeWidget):
         item = controller.tree_item
         self._controllers.pop(item)
         self.invisibleRootItem().removeChild(item)
-
-    def remove_current_view(self) -> ViewController:
-        controller = self.get_current_controller()
-        if controller:
-            self.remove_view(controller)
-            item = controller.tree_item
-            next_item = self.itemAbove(item)
-            next_item = self._get_root_parent(next_item)
-
-            if self.currentItem() is None:
-                self.setCurrentItem(next_item)
-
-        return controller
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._drag_model = None
@@ -99,7 +94,6 @@ class ViewsTreeWidget(QTreeWidget):
                     model = controller.model[cols]
 
                 if not self._drag_model.can_merge(model):
-                    self._drag_model.deleteLater()
                     self._drag_model = None
                     event.ignore()
                     return
@@ -144,12 +138,21 @@ class ViewsTreeWidget(QTreeWidget):
                         item.checkState(0) == Qt.Checked
                     )
 
-    def _current_item_changed(
-        self, current: QTreeWidgetItem, previous: QTreeWidgetItem
-    ) -> None:
+    def _current_item_changed(self, current: QTreeWidgetItem, _) -> None:
         new = self.get_controller(current)
-        old = self.get_controller(previous)
-        self.currentViewChanged.emit(new, old)
+        if new != self._current_controller:
+            old = self._current_controller
+            self._current_controller = new
+            self.currentViewChanged.emit(new, old)
+
+            columns = self.columnCount()
+            if new:
+                for col in range(columns):
+                    new.tree_item.setBackground(col, self.current_view_color)
+
+            if old:
+                for col in range(columns):
+                    old.tree_item.setBackground(col, QBrush())
 
     def _selection_changed(self) -> None:
         controllers = self.get_selected_controllers()

@@ -42,6 +42,12 @@
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
       <widget class="ViewsTreeWidget" name="treeWidget">
+       <property name="alternatingRowColors">
+        <bool>true</bool>
+       </property>
+       <property name="animated">
+        <bool>true</bool>
+       </property>
        <column>
         <property name="text">
          <string>Name</string>

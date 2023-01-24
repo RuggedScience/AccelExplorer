@@ -21,13 +21,12 @@ class ParserPlugin(IPlugin, ABC):
     def supported_extensions() -> tuple[str]:
         pass
 
-    @classmethod
-    def can_parse(cls, filename: str) -> bool:
+    def can_parse(self, filename: str) -> bool:
         path = Path(filename)
         return (
             path.exists()
             and path.is_file()
-            and path.suffix in cls.supported_extensions()
+            and path.suffix in self.supported_extensions()
         )
 
     @abstractmethod

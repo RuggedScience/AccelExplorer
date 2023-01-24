@@ -16,6 +16,7 @@ class ViewModel(QObject):
         self,
         df: pd.DataFrame = pd.DataFrame(),
         y_axis: str = "",
+        x_axis: str = None,
         points: dict[str, QPointFList] = None,
         parent: QObject = None,
         lazy: bool = True
@@ -24,6 +25,7 @@ class ViewModel(QObject):
 
         self._df = df.copy()
         self._y_axis = y_axis
+        self._x_axis = x_axis
         self._points = None
 
         if points is None:
@@ -50,6 +52,8 @@ class ViewModel(QObject):
     
     @property
     def x_axis(self) -> str:
+        if self._x_axis is not None:
+            return self._x_axis
         return self._df.index.name
     
     @property
@@ -100,6 +104,7 @@ class ViewModel(QObject):
         
         new_cols = set(other._df.columns).difference(self._df)
         
+        # If this is an empty model just copy other into this one.
         if self.empty:
             self._df = other._df
             self._points = other._points
@@ -107,9 +112,12 @@ class ViewModel(QObject):
         else:
             for col in new_cols:
                 self._df[col] = other._df[col].copy()
-                self._points[col] = other._points[col]
+                # Use points from other if they have been generated
+                if other._points is not None:
+                    if self._points is None:
+                        self._points = {}
+                    self._points[col] = other._points[col]
 
-            # df = pd.concat([self._df, other], axis="columns")
             self._df.sort_index(inplace=True)
 
         # Wait until we're done to emit the signals
@@ -136,7 +144,9 @@ class ViewModel(QObject):
     def rename(self, columns: dict[str, str]) -> None:
         self._df.rename(columns=columns, inplace=True)
         for old, new in columns.items():
-            self._points[new] = self._points.pop(old)
+            if self._points is not None:
+                self._points[new] = self._points.pop(old)
+
             self.name_changed.emit(old, new)
 
     @staticmethod

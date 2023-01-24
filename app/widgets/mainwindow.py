@@ -23,8 +23,8 @@ from PySide6.QtWidgets import (
 )
 from yapsy.PluginManager import PluginManager
 
-from app.plugins.dataframeplugins import (
-    DataFramePlugin,
+from app.plugins.viewmodelplugin import (
+    ViewModelPlugin,
     FilterPlugin,
     ViewPlugin,
 )
@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
                 os.path.join(plugin_path, "views"),
             ]
         )
-        pm.setCategoriesFilter({"parsers": ParserPlugin, "dataframe": DataFramePlugin})
+        pm.setCategoriesFilter({"parsers": ParserPlugin, "dataframe": ViewModelPlugin})
         pm.collectPlugins()
 
         self._parsers: list[ParserPlugin] = [
@@ -479,7 +479,7 @@ class MainWindow(QMainWindow):
             if isinstance(action, DataframePluginAction):
                 can_process = bool(controllers)
                 for controller in controllers:
-                    if not action.plugin.can_process(controller.df):
+                    if not action.plugin.can_process(controller.model):
                         can_process = False
                         break
                 action.setEnabled(can_process)
@@ -525,29 +525,21 @@ class MainWindow(QMainWindow):
         new_controllers = []
         combine = values.pop("combine", False)
         if combine:
-            combined_df = None
+            combined_model = ViewModel()
             for controller in controllers:
-                df = controller.df.add_suffix(f" - {controller.name}")
-                plugin.set_df(df)
-                df = plugin.process(**values)
-
-                if combined_df is None:
-                    combined_df = df
-                else:
-                    combined_df = pd.concat([combined_df, df], axis="columns")
-
-            model = ViewModel(combined_df, plugin.y_title)
+                model = plugin.process(controller.model, **values)
+                model.add_suffix(f" - {controller.name}")
+                combined_model.merge(model)
+                
             controller = self._add_view(
                 plugin.name,
-                model,
+                combined_model,
                 plugin.display_markers,
             )
             new_controllers.append(controller)
         else:
             for controller in controllers:
-                plugin.set_df(controller.df)
-                df = plugin.process(**values)
-                model = ViewModel(df, plugin.y_title)
+                model = plugin.process(controller.model, **values)
                 controller = self._add_view(
                     f"{plugin.name} - {controller.name}",
                     model,
@@ -579,8 +571,7 @@ class MainWindow(QMainWindow):
                 values = {}
 
             for controller in controllers:
-                plugin.set_df(controller.df)
-                filtered_df = plugin.process(**values)
+                model = plugin.process(controller.model, **values)
                 title = f"{plugin.name} ("
                 for key, option in options.items():
                     if key in values:
@@ -592,7 +583,6 @@ class MainWindow(QMainWindow):
                 # Remove trailing comma
                 title = title[:-1]
                 title += ")"
-                model = ViewModel(filtered_df)
                 controller.set_model(model, title=title)
 
     def _plugin_action_triggered(self) -> None:
@@ -624,14 +614,14 @@ class MainWindow(QMainWindow):
 
 class DataframePluginAction(QAction):
     def __init__(
-        self, plugin: DataFramePlugin, description: str = None, parent: QObject = None
+        self, plugin: ViewModelPlugin, description: str = None, parent: QObject = None
     ):
         super().__init__(plugin.name, parent)
         self.setToolTip(description)
         self._plugin = plugin
 
     @property
-    def plugin(self) -> DataFramePlugin:
+    def plugin(self) -> ViewModelPlugin:
         return self._plugin
 
 

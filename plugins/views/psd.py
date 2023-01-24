@@ -1,30 +1,22 @@
 import endaq as ed
 import pandas as pd
 
-from app.plugins import dataframeplugins
+from app.plugins import viewmodelplugin
 from app.plugins.options import DataOption, NumericOption, ListOption, ListOptionPair
-from app.utils import classproperty
+from app.views import ViewModel
 
 
-class PSDPlugin(dataframeplugins.ViewPlugin):
-    @classproperty
-    def name(cls) -> str:
+class PSDPlugin(viewmodelplugin.ViewPlugin):
+    @property
+    def name(self) -> str:
         return "PSD"
 
-    @classproperty
-    def add_to_toolbar(cls) -> bool:
+    @property
+    def add_to_toolbar(self) -> bool:
         return True
 
     @property
-    def x_title(self) -> str:
-        return "Frequency (Hz)"
-
-    @property
-    def y_title(self) -> str:
-        return "Amplitude"
-
-    @classproperty
-    def options(cls) -> dict[str, DataOption]:
+    def options(self) -> dict[str, DataOption]:
         return {
             "bin_width": NumericOption("Bin Width", 1, 1, None),
             "scaling": ListOption(
@@ -37,9 +29,13 @@ class PSDPlugin(dataframeplugins.ViewPlugin):
             ),
         }
 
-    @classmethod
-    def can_process(cls, df: pd.DataFrame) -> bool:
-        return df.index.inferred_type == "timedelta64"
+    def can_process(self, model: ViewModel) -> bool:
+        return model.index_type in ("timedelta64", )
 
-    def process(self, **kwargs) -> pd.DataFrame:
-        return ed.endaq.calc.psd.welch(self._df, **kwargs)
+    def process(self, model: ViewModel, **kwargs) -> ViewModel:
+        df = ed.endaq.calc.psd.welch(model.df, **kwargs)
+        y_axis = model.y_axis
+        index = y_axis.rfind(")")
+        if index > 0:
+            y_axis = f"{y_axis[:index]}**2/Hz)"
+        return ViewModel(df, y_axis=y_axis)
