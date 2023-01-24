@@ -33,7 +33,7 @@ from app.plugins.options import BoolOption, ListOption
 from app.plugins.parserplugins import ParserPlugin
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import SignalBlocker, timing, get_plugin_path
-from app.viewcontroller import ViewController, ViewSeries
+from app.views import ViewModel, ViewController, ViewSeries
 from app.widgets.optionsdialog import OptionsDialog
 from app.widgets.parserdialog import ParserDialog
 
@@ -187,9 +187,9 @@ class MainWindow(QMainWindow):
     ) -> ViewController:
         controller = ViewController(
             name,
-            df,
+            ViewModel(df),
             display_markers=display_markers,
-            parent_item=self.ui.treeWidget,
+            item_parent=self.ui.treeWidget,
             parent=parent_item or self,
         )
         controller.x_axis.setTitleText(x_title)
@@ -203,7 +203,6 @@ class MainWindow(QMainWindow):
 
         self.ui.stackedWidget.addWidget(controller.chart_view)
         self.ui.treeWidget.add_view(controller)
-        # self._open_views[tree_item] = controller
 
         self.ui.treeWidget.setCurrentItem(tree_item)
 
@@ -459,7 +458,7 @@ class MainWindow(QMainWindow):
         if isinstance(sender, ViewController):
             color = QColorDialog.getColor(series.color, self)
             if color.isValid():
-                sender.set_series_color(series, color)
+                series.color = color
 
     def _open_files(self) -> None:
         filters = "Data files ("
@@ -564,7 +563,8 @@ class MainWindow(QMainWindow):
                 # Remove trailing comma
                 title = title[:-1]
                 title += ")"
-                controller.set_df(filtered_df, title)
+                model = ViewModel(filtered_df)
+                controller.set_model(model, title=title)
 
     def _plugin_action_triggered(self) -> None:
         sender = self.sender()

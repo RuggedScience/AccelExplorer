@@ -1,10 +1,12 @@
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
+import pandas as pd
+
+from PySide6.QtCore import Qt, Signal, QChildEvent
 from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
-from app.viewcontroller import ViewController, ViewSeries
+from app.views import ViewController, ViewSeries, ViewModel
 
 
 class ViewsTreeWidget(QTreeWidget):
@@ -26,9 +28,9 @@ class ViewsTreeWidget(QTreeWidget):
         self.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.itemChanged.connect(self._item_changed)
 
-        self._drag_dfs = None
         self._controllers: dict[QTreeWidgetItem, ViewController] = {}
 
+        self._drag_df = None
         self._hovered_series = None
 
     def add_view(self, controller: ViewController) -> None:
@@ -55,27 +57,8 @@ class ViewsTreeWidget(QTreeWidget):
 
         return controller
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        # Call the mouse event first so the selections are updated
-        super().mousePressEvent(event)
-
-        controllers = self.get_selected_controllers()
-        self._drag_dfs = {}
-        for controller in controllers:
-            df = controller.df
-            if not controller.tree_item.isSelected():
-                cols = []
-                for col in df:
-                    if col in controller:
-                        if controller[col].tree_item.isSelected():
-                            cols.append(col)
-
-                df = df[cols]
-
-            self._drag_dfs[controller] = df
-
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self._drag_dfs = None
+        self._drag_df = None
         return super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
@@ -94,43 +77,66 @@ class ViewsTreeWidget(QTreeWidget):
 
         return super().mouseMoveEvent(event)
 
-    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        return super().dragEnterEvent(event)
-
-    def _drag_is_valid(self) -> bool:
-        return bool(self._drag_dfs)
-
     def _drop_is_valid(self, controller: ViewController) -> bool:
         return (
             controller
-            and controller not in self._drag_dfs
-            and controller.can_add_data(self._drag_dfs.values())
+            and controller not in self.get_selected_controllers()
+            and controller.model.can_merge(self._drag_df)
         )
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if event.source() is self:
+            controllers = self.get_selected_controllers()
+            dfs = []
+            index_type = None
+            for controller in controllers:
+                df = controller.df
+
+                # All of the index types must be the same
+                if index_type is None:
+                    index_type = df.index.inferred_type
+                elif df.index.inferred_type != index_type:
+                    self._drag_df = None
+                    event.ignore()
+                    return
+
+                if not controller.tree_item.isSelected():
+                    cols = []
+                    for col in df:
+                        if col in controller:
+                            if controller[col].tree_item.isSelected():
+                                cols.append(col)
+
+                    df = df[cols]
+
+                df = df.add_suffix(f" - {controller.name}")
+
+                dfs.append(df)
+            self._drag_df = pd.concat(dfs, axis="columns")
+            event.acceptProposedAction()
+        # return super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
         super().dragMoveEvent(event)
 
-        if self._drag_is_valid():
-            drop_item = self.itemAt(event.pos())
-            drop_controller = self.get_controller(drop_item)
-            if self._drop_is_valid(drop_controller):
-                event.acceptProposedAction()
-                return
-
-        event.ignore()
+        drop_item = self.itemAt(event.pos())
+        drop_controller = self.get_controller(drop_item)
+        if self._drop_is_valid(drop_controller):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def dropEvent(self, event: QDropEvent) -> None:
-        if self._drag_is_valid():
-            drop_item = self.itemAt(event.pos())
-            drop_controller = self.get_controller(drop_item)
-            if self._drop_is_valid(drop_controller):
-                for controller, df in self._drag_dfs.items():
-                    drop_controller.add_data(controller.name, df)
-                event.acceptProposedAction()
-                self.setCurrentItem(drop_item)
-                return
-
-        event.ignore()
+        drop_item = self.itemAt(event.pos())
+        drop_controller = self.get_controller(drop_item)
+        if self._drop_is_valid(drop_controller):
+            model = drop_controller.model.copy()
+            model.merge(self._drag_df)
+            drop_controller.set_model(model, title="Combined views")
+            event.acceptProposedAction()
+            self.setCurrentItem(drop_item)
+        else:
+            event.ignore()
 
     def _item_changed(self, item: QTreeWidgetItem, col: int) -> None:
         if col == 0:
@@ -138,9 +144,10 @@ class ViewsTreeWidget(QTreeWidget):
             controller = self.get_controller(item)
             if controller:
                 if parent is item:
-                    controller.name = item.text(0)
+                    controller.set_name(item.text(0))
                 elif item in controller:
-                    controller.rename_series(item)
+                    series = controller[item]
+                    series.set_name(item.text(0))
                     controller[item].chart_series.setVisible(
                         item.checkState(0) == Qt.Checked
                     )
@@ -181,7 +188,7 @@ class ViewsTreeWidget(QTreeWidget):
 
     def _item_clicked(self, item: QTreeWidgetItem, col: int) -> None:
         controller = self.get_controller(item)
-        # Automatically deselect all series when a view is deselected
-        if controller and item is controller.tree_item and not item.isSelected():
+        # Automatically select / deselect all series when a view is selected / deselected
+        if controller and item is controller.tree_item:
             for series in controller:
                 series.tree_item.setSelected(item.isSelected())
