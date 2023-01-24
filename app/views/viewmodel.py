@@ -1,16 +1,20 @@
+from copy import deepcopy
+
 import pandas as pd
 from endaq.calc.utils import sample_spacing
 
-from PySide6.QtCore import QObject, QPointF, Signal
+from PySide6.QtCore import QObject, QPointF, Signal, QPointFList
 
 
 class ViewModel(QObject):
     data_changed = Signal()
+    series_added = Signal(str)
+    series_removed = Signal(str)
 
     def __init__(
         self,
         df: pd.DataFrame = pd.DataFrame(),
-        points: dict[str, list[QPointF]] = None,
+        points: dict[str, QPointFList] = None,
         parent: QObject = None,
     ):
         super().__init__(parent)
@@ -21,6 +25,18 @@ class ViewModel(QObject):
             self._points = self.generate_points(df)
         else:
             self._points = points.copy()
+
+    def __getitem__(self, key) -> "ViewModel":
+        key = list(key)
+
+        points = {}
+        for name in key:
+            if not isinstance(name, str):
+                raise TypeError(f"Invalid key type. Expected string, got {type(name)}.")
+
+            points[name] = self._points[name]
+
+        return ViewModel(self._df[key], points)
 
     @property
     def df(self) -> pd.DataFrame:
@@ -33,7 +49,7 @@ class ViewModel(QObject):
         self.data_changed.emit()
 
     @property
-    def points(self) -> dict[str, list[QPointF]]:
+    def points(self) -> dict[str, QPointFList]:
         return self._points.copy()
 
     @property
@@ -48,37 +64,64 @@ class ViewModel(QObject):
     def copy(self) -> "ViewModel":
         return ViewModel(self._df, self._points)
 
-    def merge(self, other: pd.DataFrame) -> None:
-        if isinstance(other, ViewModel):
-            other = other.df
+    def remove_series(self, name: str) -> None:
+        assert name in self._df
+        assert name in self._points
 
-        df = pd.concat([self._df, other], axis="columns")
-        df.sort_index(inplace=True)
-        self.df = df
+        self._df.drop(name, axis="columns", inplace=True)
+        del self._points[name]
 
-    def can_merge(self, df: pd.DataFrame) -> bool:
-        if self._df.index.inferred_type != df.index.inferred_type:
+        self.series_removed.emit(name)
+        self.data_changed.emit()
+
+    def merge(self, other: "ViewModel") -> None:
+        if not self.can_merge(other):
+            raise ValueError("Cannot merge non matching models")
+
+        new_cols = set(other._df.columns).difference(self._df)
+        for col in new_cols:
+            self._df[col] = other._df[col].copy()
+            self._points[col] = other._points[col]
+
+        # df = pd.concat([self._df, other], axis="columns")
+        self._df.sort_index(inplace=True)
+
+        # Wait until we're done to end the signals
+        for col in new_cols:
+            self.series_added.emit(col)
+
+    def can_merge(self, other: "ViewModel") -> bool:
+        if self.empty:
+            return True
+
+        if self._df.index.inferred_type != other._df.index.inferred_type:
             return False
 
-        if df.index.inferred_type == "timedelta64":
-            if sample_spacing(df) != sample_spacing(self._df):
+        if other._df.index.inferred_type == "timedelta64":
+            if sample_spacing(other._df) != sample_spacing(self._df):
                 return False
         return True
 
-    def rename(self, old: str, new: str) -> None:
-        assert old in self._df
-        assert old in self._points
+    def add_suffix(self, suffix: str) -> None:
+        columns = {col: col + suffix for col in self._df}
+        self.rename(columns)
 
-        self._df.rename(columns={old: new}, inplace=True)
-        self._points[new] = self._points.pop(old)
+    def rename(self, columns: dict[str, str]) -> None:
+        self._df.rename(columns=columns, inplace=True)
+        for old, new in columns.items():
+            self._points[new] = self._points.pop(old)
 
     @staticmethod
-    def generate_points(df: pd.DataFrame) -> dict[str, list[QPointF]]:
+    def generate_points(df: pd.DataFrame) -> dict[str, QPointFList]:
         d = {}
+        df = df.astype(float)
         for col, series in df.items():
             if series.index.inferred_type == "timedelta64":
-                series = series.copy()
                 series.index = series.index.total_seconds()
 
-            d[col] = [QPointF(float(i), float(v)) for i, v in series.items()]
+            points = QPointFList()
+            points.reserve(series.size)
+            for i, v in series.items():
+                points.append(QPointF(i, v))
+            d[col] = points
         return d

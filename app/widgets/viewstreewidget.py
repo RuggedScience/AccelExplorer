@@ -30,7 +30,7 @@ class ViewsTreeWidget(QTreeWidget):
 
         self._controllers: dict[QTreeWidgetItem, ViewController] = {}
 
-        self._drag_df = None
+        self._drag_model = None
         self._hovered_series = None
 
     def add_view(self, controller: ViewController) -> None:
@@ -58,7 +58,7 @@ class ViewsTreeWidget(QTreeWidget):
         return controller
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self._drag_df = None
+        self._drag_model = None
         return super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
@@ -81,40 +81,32 @@ class ViewsTreeWidget(QTreeWidget):
         return (
             controller
             and controller not in self.get_selected_controllers()
-            and controller.model.can_merge(self._drag_df)
+            and controller.model.can_merge(self._drag_model)
         )
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.source() is self:
+            self._drag_model = ViewModel()
             controllers = self.get_selected_controllers()
-            dfs = []
-            index_type = None
             for controller in controllers:
-                df = controller.df
-
-                # All of the index types must be the same
-                if index_type is None:
-                    index_type = df.index.inferred_type
-                elif df.index.inferred_type != index_type:
-                    self._drag_df = None
-                    event.ignore()
-                    return
-
+                model = controller.model.copy()
                 if not controller.tree_item.isSelected():
                     cols = []
-                    for col in df:
+                    for col in model.df:
                         if col in controller:
                             if controller[col].tree_item.isSelected():
                                 cols.append(col)
+                    model = controller.model[cols]
 
-                    df = df[cols]
+                if not self._drag_model.can_merge(model):
+                    self._drag_model.deleteLater()
+                    self._drag_model = None
+                    event.ignore()
+                    return
 
-                df = df.add_suffix(f" - {controller.name}")
-
-                dfs.append(df)
-            self._drag_df = pd.concat(dfs, axis="columns")
+                model.add_suffix(f" - {controller.name}")
+                self._drag_model.merge(model)
             event.acceptProposedAction()
-        # return super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
         super().dragMoveEvent(event)
@@ -131,7 +123,7 @@ class ViewsTreeWidget(QTreeWidget):
         drop_controller = self.get_controller(drop_item)
         if self._drop_is_valid(drop_controller):
             model = drop_controller.model.copy()
-            model.merge(self._drag_df)
+            model.merge(self._drag_model)
             drop_controller.set_model(model, title="Combined views")
             event.acceptProposedAction()
             self.setCurrentItem(drop_item)

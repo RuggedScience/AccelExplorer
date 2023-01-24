@@ -6,7 +6,7 @@ from io import TextIOWrapper
 
 import endaq as ed
 import pandas as pd
-from PySide6.QtCore import QFileInfo, QObject, QSettings, Qt, QTimer
+from PySide6.QtCore import QFileInfo, QObject, QSettings, QTimer
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
@@ -300,6 +300,11 @@ class MainWindow(QMainWindow):
         else:
             super().dropEvent(event)
 
+    def _close_view(self, controller: ViewController) -> None:
+        self.ui.treeWidget.remove_view(controller)
+        self.ui.stackedWidget.removeWidget(controller.chart_view)
+        controller.deleteLater()
+
     def _close_current_selection(self) -> None:
         controllers = self.ui.treeWidget.get_selected_controllers()
         # If there is no selection, close the current view
@@ -309,9 +314,22 @@ class MainWindow(QMainWindow):
                 controllers = [current_controller]
 
         for controller in controllers:
-            self.ui.treeWidget.remove_view(controller)
-            self.ui.stackedWidget.removeWidget(controller.chart_view)
-            controller.deleteLater()
+            # If the root tree item is selected just close the entire view
+            if controller.tree_item.isSelected():
+                self._close_view(controller)
+            # If not, close only the selected series
+            else:
+                cols = [
+                    series.name
+                    for series in controller
+                    if not series.tree_item.isSelected()
+                ]
+                # If all of the series are selected just close the entire view
+                if not cols:
+                    self._close_view(controller)
+                else:
+                    new_model = controller.model[cols]
+                    controller.set_model(new_model, title="Removed series")
 
     def _export_current_view(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
