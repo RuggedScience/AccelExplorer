@@ -636,8 +636,8 @@ class ViewMetaData:
         controller.x_axis.setMinorTickCount(self.x_minor_ticks)
         controller.x_axis.setTickCount(self.x_major_ticks)
         controller.y_axis.setTitleText(self.y_title)
-        controller.y_axis.setMinorTickCount(self.y_major_ticks)
-        controller.y_axis.setTickCount(self.y_minor_ticks)
+        controller.y_axis.setMinorTickCount(self.y_minor_ticks)
+        controller.y_axis.setTickCount(self.y_major_ticks)
         controller.series_width = self.series_width
         controller.marker_count = self.marker_count
         controller.marker_size = self.marker_size
