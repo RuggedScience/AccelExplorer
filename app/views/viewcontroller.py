@@ -85,16 +85,6 @@ class ViewSeries(QObject):
     @points.setter
     def points(self, points: list[QPointF]) -> None:
         self.chart_series.replace(points)
-        # Only use OpenGL with large datasets
-        use_opengl = len(points) > 100000
-        # Bug when disabling opengl causes the "old"
-        # series data to still be drawn on top of
-        # the new series data. Hide and show fixes this.
-        if not use_opengl and self._chart_series.useOpenGL():
-            QTimer.singleShot(10, self._chart_series.hide)
-            QTimer.singleShot(10, self._chart_series.show)
-
-        self._chart_series.setUseOpenGL(use_opengl)
 
     @property
     def color(self) -> QColor:
@@ -496,6 +486,19 @@ class ViewController(QObject):
             points = all_points.get(view_series.name)
             if points is not None:
                 view_series.points = points
+
+        # Use OpenGL with larger datasets
+        use_opengl = self.model.size > 50000
+        for series in self:
+            cs = series.chart_series
+            if cs.useOpenGL() != use_opengl:
+                cs.setUseOpenGL(use_opengl)
+                # Bug when disabling opengl causes the "old"
+                # series data to still be drawn on top of
+                # the new series data. Hide and show fixes this.
+                if cs.isVisible():
+                    QTimer.singleShot(10, series.chart_series.hide)
+                    QTimer.singleShot(20, series.chart_series.show)
 
     def _update_marker_points(self) -> None:
         if not self._display_markers:

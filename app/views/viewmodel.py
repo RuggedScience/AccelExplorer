@@ -41,12 +41,11 @@ class ViewModel(QObject):
     @property
     def df(self) -> pd.DataFrame:
         return self._df.copy()
-
-    @df.setter
-    def df(self, df: pd.DataFrame) -> None:
-        self._df = df.copy()
-        self._points = self.generate_points(df)
-        self.data_changed.emit()
+    
+    @property
+    def size(self) -> int:
+        return self._df.size
+    
 
     @property
     def points(self) -> dict[str, QPointFList]:
