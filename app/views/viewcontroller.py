@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from PySide6.QtCharts import QChart, QValueAxis, QLineSeries
 from PySide6.QtCore import QObject, QPointF, Qt, Signal, QTimer
-from PySide6.QtGui import QColor, QKeySequence, QUndoStack, QImage
+from PySide6.QtGui import QColor, QUndoStack, QImage
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
 from app.utils import MarkerGenerator, MarkerShape, undoable
@@ -91,7 +91,7 @@ class ViewSeries(QObject):
         # series data to still be drawn on top of
         # the new series data. Hide and show fixes this.
         if not use_opengl and self._chart_series.useOpenGL():
-            self._chart_series.hide()
+            QTimer.singleShot(10, self._chart_series.hide)
             QTimer.singleShot(10, self._chart_series.show)
 
         self._chart_series.setUseOpenGL(use_opengl)
