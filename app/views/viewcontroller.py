@@ -272,7 +272,7 @@ class ViewController(QObject):
             # self._model.sample_rate_changed.connect(self._update_tooltip)
 
         self._update_tooltip()
-        self._sync_series_to_model()
+        self._sync_to_model()
         self._data_changed()
         self.fit_contents()
 
@@ -482,7 +482,13 @@ class ViewController(QObject):
         self._view_series.pop(view_series.tree_item)
         view_series.deleteLater()
 
-    def _sync_series_to_model(self) -> None:
+    def _sync_points_to_model(self) -> None:
+        all_points = self._model.points
+        for name, points in all_points.items():
+            if name in self:
+                self[name].points = points
+
+    def _sync_to_model(self) -> None:
         df = self._model.df
         new_names = {str(col) for col in df}
         old_names = {s.name for s in self._view_series.values()}
@@ -490,11 +496,13 @@ class ViewController(QObject):
         added_cols = new_names.difference(old_names)
         removed_cols = old_names.difference(new_names)
 
-        for name in removed_cols:
+        for name in sorted(removed_cols):
             self._remove_series(name)
 
-        for name in added_cols:
+        for name in sorted(added_cols):
             self._add_series(name)
+
+        self._sync_points_to_model()
 
     def _update_tooltip(self) -> None:
         lines = self._tooltip_lines.copy()
