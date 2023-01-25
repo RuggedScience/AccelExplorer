@@ -295,26 +295,29 @@ class MainWindow(QMainWindow):
         # If there is no selection, close the current view
         if not controllers:
             current_controller = self.ui.treeWidget.get_current_controller()
-            if current_controller:
-                controllers = [current_controller]
-
-        for controller in controllers:
-            # If the root tree item is selected just close the entire view
-            if controller.tree_item.isSelected():
-                self._close_view(controller)
-            # If not, close only the selected series
-            else:
-                cols = [
-                    series.name
-                    for series in controller
-                    if not series.tree_item.isSelected()
-                ]
-                # If all of the series are selected just close the entire view
-                if not cols:
+            self._close_view(current_controller)
+        else:
+            for controller in controllers:
+                # If the root tree item is selected just close the entire view
+                if controller.tree_item.isSelected():
                     self._close_view(controller)
+                # If not, close only the selected series
                 else:
-                    new_model = controller.model[cols]
-                    controller.set_model(new_model, title="Removed series")
+                    # Created a list of series that aren't selected.
+                    # This is the list of columns to keep.
+                    cols = [
+                        series.name
+                        for series in controller
+                        if not series.tree_item.isSelected()
+                    ]
+                    # If we aren't keeping any columns, just close the view
+                    if not cols:
+                        self._close_view(controller)
+                    # Else if we aren't keeping all of the columns
+                    # create a new model with those columns.
+                    elif len(cols) != len(controller):
+                        new_model = controller.model[cols]
+                        controller.set_model(new_model, title="Removed series")
 
     def _export_current_view(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -532,16 +535,22 @@ class MainWindow(QMainWindow):
                 combined_model,
                 plugin.display_markers,
             )
+
             new_controllers.append(controller)
         else:
             for controller in controllers:
                 model = plugin.process(controller.model, **values)
-                controller = self._add_view(
+                new_controller = self._add_view(
                     f"{plugin.name} - {controller.name}",
                     model,
                     plugin.display_markers,
                 )
-                new_controllers.append(controller)
+
+                for series in new_controller:
+                    if series.name in controller:
+                        series.color = controller[series.name].color
+
+                new_controllers.append(new_controller)
 
         tooltips = []
         for key, option in options.items():
@@ -599,7 +608,7 @@ class MainWindow(QMainWindow):
                 if parse_dates:
                     df.index = pd.to_timedelta(df.index, unit=None)
 
-                model = ViewModel(df, metadata.y_title)
+                model = ViewModel(df, y_axis=metadata.y_title)
                 controller = self._add_file(filename, model)
                 metadata.to_controller(controller)
                 return True
