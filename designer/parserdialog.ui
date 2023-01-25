@@ -295,6 +295,20 @@
    <header location="global">app.widgets.csvviewer</header>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>headerRowSpinBox</tabstop>
+  <tabstop>yAxisLineEdit</tabstop>
+  <tabstop>indexComboBox</tabstop>
+  <tabstop>indexTypeComboBox</tabstop>
+  <tabstop>sampleRateSpinBox</tabstop>
+  <tabstop>csvViewer</tabstop>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>skip_button</tabstop>
+  <tabstop>parse_button</tabstop>
+  <tabstop>parseAll_button</tabstop>
+  <tabstop>finish_button</tabstop>
+  <tabstop>cancel_button</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
