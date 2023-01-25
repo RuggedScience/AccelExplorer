@@ -121,6 +121,9 @@ class ViewsTreeWidget(QTreeWidget):
             drop_controller.set_model(model, title="Combined views")
             event.acceptProposedAction()
             self.setCurrentItem(drop_item)
+
+            if drop_item.childCount() > 1:
+                drop_item.setExpanded(True)
         else:
             event.ignore()
 

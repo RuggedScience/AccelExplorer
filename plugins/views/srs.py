@@ -39,8 +39,9 @@ class SRSPlugin(viewmodelplugin.ViewPlugin):
         min_x = kwargs.pop("min_freq", 10)
         max_x = kwargs.pop("max_freq", 1000)
         dampening = kwargs.pop("dampening", 5) / 100
+        df = model.df.dropna(how="any")
         srs = ed.endaq.calc.shock.shock_spectrum(
-            model.df,
+            df,
             damp=dampening,
             init_freq=min_x,
             **kwargs,

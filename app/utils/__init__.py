@@ -6,10 +6,9 @@ from collections.abc import Iterable
 from functools import wraps
 from time import time
 
-import endaq as ed
+import numpy as np
 import pandas as pd
 
-from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QWidget
 
 
@@ -42,6 +41,20 @@ def timing(f):
         return result
 
     return wrap
+
+
+def generate_time_index(sample_rate: int, size: int) -> pd.TimedeltaIndex:
+    """Create a Pandas TimeDeltaIndex with the given sample rate and size."""
+
+    # Do all calculations in nanoseconds to keep values
+    # as integers and prevent floating point errors.
+    spacing = 1_000_000_000 / sample_rate
+    end = spacing * size
+
+    values = np.arange(stop=int(end), step=int(spacing))
+    # Clamp index to size of the dataframe
+    # to prevent length mismatch errors.
+    return pd.to_timedelta(values[:size], unit="ns")
 
 
 class SignalBlocker:

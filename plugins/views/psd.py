@@ -38,7 +38,8 @@ class PSDPlugin(viewmodelplugin.ViewPlugin):
         min_x = kwargs.pop("min_freq", 10)
         max_x = kwargs.pop("max_freq", 1000)
 
-        psd = ed.endaq.calc.psd.welch(model.df, **kwargs)
+        df = model.df.dropna(how="any")
+        psd = ed.endaq.calc.psd.welch(df, **kwargs)
         psd = psd[(psd.index >= min_x) & (psd.index <= max_x)]
         y_axis = model.y_axis
 

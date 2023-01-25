@@ -23,12 +23,14 @@ class FFTPlugin(viewmodelplugin.ViewPlugin):
         }
 
     def can_process(self, model: ViewModel) -> bool:
-        return model.index_type in ("timedelta64", )
+        return model.index_type in ("timedelta64",)
 
     def process(self, model: ViewModel, **kwargs) -> ViewModel:
         min_x = kwargs.get("min_freq", 10)
         max_x = kwargs.get("max_freq", 1000)
-        fft = ed.endaq.calc.fft.fft(model.df)
+
+        df = model.df.dropna(how="any")
+        fft = ed.endaq.calc.fft.fft(df)
         # Clamp to min / max values
         fft = fft[(fft.index >= min_x) & (fft.index <= max_x)]
         return ViewModel(fft, y_axis="Magnitude")

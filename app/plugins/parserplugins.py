@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from yapsy.IPlugin import IPlugin
 
+from app.utils import generate_time_index
 from app.views import ViewModel
 
 
@@ -41,9 +42,9 @@ class CSVParser(ParserPlugin):
 
     def can_parse(self, filename: str) -> bool:
         return os.path.exists(filename)
-    
+
     def _parse_to_df(
-        self, 
+        self,
         filename: str,
         header_row: int = 1,
         index_type: str = None,
@@ -66,20 +67,16 @@ class CSVParser(ParserPlugin):
             raise ParseError("No numeric data found")
 
         if sample_rate:
-            spacing = 1 / sample_rate
-            df.set_index(
-                pd.to_timedelta([spacing * i for i in range(len(df))], unit="S"),
-                inplace=True,
-            )
+            index = generate_time_index(sample_rate, size=len(df))
+            df.set_index(index, inplace=True)
         elif index_type and index_type != "number":
             time_units = index_type
             if index_type == "timestamp":
                 time_units = None
-            df.index = pd.to_timedelta(df.index, unit=time_units)
 
-            start_time = df.index[0]
-            df.index = df.index - start_time
-
+            index = pd.to_timedelta(df.index, unit=time_units)
+            index = index - index[0]
+            df.set_index(index, inplace=True)
         if df.index.inferred_type == "timedelta64":
             df.index.rename("Time (s)", inplace=True)
 
@@ -88,8 +85,8 @@ class CSVParser(ParserPlugin):
     def parse(
         self,
         filename: str,
-        x_axis_title = "",
-        y_axis_title = "",
+        x_axis_title="",
+        y_axis_title="",
         **kwargs,
     ) -> ViewModel:
         df = self._parse_to_df(filename=filename, **kwargs)

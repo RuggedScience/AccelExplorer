@@ -1,7 +1,8 @@
 import pandas as pd
 from endaq.calc.utils import sample_spacing
+from PySide6.QtCore import QObject, QPointF, QPointFList, Signal
 
-from PySide6.QtCore import QObject, QPointF, Signal, QPointFList
+from app.utils import generate_time_index
 
 
 class ViewModel(QObject):
@@ -22,14 +23,15 @@ class ViewModel(QObject):
     ):
         super().__init__(parent)
 
+        self.data_changed.connect(self._update_sample_rate)
+
         self._df = df.copy()
         self._y_axis = y_axis
         self._x_axis = x_axis
         self._points: dict[str, QPointFList] = {}
-
         self._sample_rate = None
-        if not df.empty and df.index.inferred_type == "timedelta64":
-            self._sample_rate = 1 / sample_spacing(df)
+
+        self._update_sample_rate()
 
         if points is None:
             if not lazy:
@@ -122,25 +124,35 @@ class ViewModel(QObject):
             # We only want to add new columns.
             # merge does not support adding data to already existing columns.
             new_df = other._df[list(new_cols)]
+
+            if other.sample_rate != self.sample_rate:
+                try:
+                    end = new_df.index[-1].total_seconds()
+                except AttributeError:
+                    pass
+                spacing = 1 / self.sample_rate
+                size = int(end / spacing)
+
+                new_index = generate_time_index(self.sample_rate, size)
+                new_df = new_df.reindex(new_index, method="nearest")
+
+                # If the sample rates didn't match and we had to
+                # resample the dataframe we can't use the old points.
+                other_points = {}
+            else:
+                other_points = other._points
+
             self._df = pd.concat([self._df, new_df], axis="columns")
             self._df.sort_index(inplace=True)
-            # Use linear interpolation to fill in missing data.
-            # Happens if files don't have the same sample rate.
-            self._df.interpolate(inplace=True)
 
             for col in new_cols:
                 # Use points from other if they have been generated
-                if col in other._points:
-                    self._points[col] = other._points[col]
+                if col in other_points:
+                    self._points[col] = other_points[col]
 
         # Wait until we're done to emit the signals
         for col in new_cols:
             self.series_added.emit(col)
-
-        sample_rate = 1 / sample_spacing(self._df)
-        if sample_rate != self._sample_rate:
-            self._sample_rate = sample_rate
-            self.sample_rate_changed.emit(sample_rate)
 
         self.data_changed.emit()
 
@@ -148,7 +160,11 @@ class ViewModel(QObject):
         if self.empty:
             return True
 
-        return self._df.index.inferred_type == other._df.index.inferred_type
+        return (
+            self._df.index.inferred_type == other._df.index.inferred_type
+            # We can't merge two models with the same series names
+            and not bool(set(self._df.columns).intersection(other._df))
+        )
 
     def add_suffix(self, suffix: str) -> None:
         columns = {col: col + suffix for col in self._df}
@@ -161,6 +177,17 @@ class ViewModel(QObject):
                 self._points[new] = self._points.pop(old)
 
             self.name_changed.emit(old, new)
+
+    def _update_sample_rate(self) -> None:
+        spacing = sample_spacing(self._df)
+        if self.index_type == "timedelta64" and spacing:
+            sample_rate = 1 / spacing
+        else:
+            sample_rate = None
+
+        if sample_rate != self._sample_rate:
+            self._sample_rate = sample_rate
+            self.sample_rate_changed.emit(sample_rate)
 
     def _series_to_points(self, series: pd.Series) -> QPointFList:
         if series.index.inferred_type == "timedelta64":
