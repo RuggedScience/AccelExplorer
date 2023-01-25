@@ -1,7 +1,7 @@
 import linecache
 from collections.abc import Iterable
+from pathlib import Path
 
-import pandas as pd
 from PySide6.QtCore import QFileInfo
 from PySide6.QtWidgets import QCheckBox, QDialog, QMessageBox, QWidget
 
@@ -13,7 +13,7 @@ from app.views import ViewModel
 class ParserDialog(QDialog):
     def __init__(
         self,
-        files: list[str],
+        files: list[Path],
         parent: QWidget = None,
     ) -> None:
         if not isinstance(files, Iterable):
@@ -26,7 +26,7 @@ class ParserDialog(QDialog):
         self.ui.setupUi(self)
 
         self._column_checkboxes: dict[str, QCheckBox] = {}
-        self._models: dict[str, ViewModel] = {}
+        self._models: dict[Path, ViewModel] = {}
         self._skipped_files = set()
 
         self.ui.headerRowSpinBox.valueChanged.connect(self._headerRowChanged)
@@ -46,23 +46,22 @@ class ParserDialog(QDialog):
         self.set_files(files)
 
     @property
-    def _current_file(self) -> str:
+    def _current_file(self) -> Path:
         return self._files[self._file_index]
 
     def set_files(self, files: Iterable[str]) -> None:
         self._file_index = 0
         self._previous_headers = []
-        self._files: list = list(files)
+        self._files: list[Path] = list(files)
         self._handle_file_changed()
 
     def _handle_file_changed(self) -> None:
-        filename = self._files[self._file_index]
-        info = QFileInfo(filename)
+        file = self._files[self._file_index]
         self.setWindowTitle(
-            f"{self._file_index + 1} / {len(self._files)} - {info.fileName()}"
+            f"{self._file_index + 1} / {len(self._files)} - {file.stem}"
         )
 
-        with open(filename) as csvfile:
+        with file.open() as csvfile:
             self.ui.csvViewer.setPlainText(csvfile.read())
 
         self._headerRowChanged(self.ui.headerRowSpinBox.value())
@@ -93,15 +92,15 @@ class ParserDialog(QDialog):
         self.ui.csvViewer.setCurrentLine(value)
         self._update_headers()
 
-    def _get_headers(self, filename: str) -> list[str]:
+    def _get_headers(self, file: Path) -> list[str]:
         lineno = self.ui.headerRowSpinBox.value()
-        headers = linecache.getline(filename, lineno).strip().split(",")
+        headers = linecache.getline(str(file), lineno).strip().split(",")
         # Remove blank headers
         return [header for header in headers if header]
 
     def _update_headers(self) -> None:
-        filename = self._files[self._file_index]
-        headers = self._get_headers(filename)
+        file = self._files[self._file_index]
+        headers = self._get_headers(file)
         # If the headers didn't change, lets keep everything the same.
         # Prevents the current item from resetting when switching to
         # next file if the files are the same format.
@@ -127,7 +126,7 @@ class ParserDialog(QDialog):
         self.ui.indexTypeComboBox.setCurrentIndex(0)
         self._indexChanged()
 
-    def _parse(self, filename: str) -> bool:
+    def _parse(self, file: Path) -> bool:
         header_row = self.ui.headerRowSpinBox.value()
         parser = CSVParser()
 
@@ -148,8 +147,8 @@ class ParserDialog(QDialog):
             index_type = self.ui.indexTypeComboBox.currentText()
 
         try:
-            self._models[filename] = parser.parse(
-                filename,
+            self._models[file] = parser.parse(
+                file=file,
                 y_axis_title=self.ui.yAxisLineEdit.text(),
                 header_row=header_row,
                 usecols=usecols,
@@ -178,8 +177,8 @@ class ParserDialog(QDialog):
         self._set_next_file()
 
     def _parse_next(self) -> bool:
-        filename = self._current_file
-        if self._parse(filename):
+        file = self._current_file
+        if self._parse(file):
             if not self._set_next_file():
                 self.accept()
 
@@ -189,12 +188,12 @@ class ParserDialog(QDialog):
         headers = None
         current_index = self._file_index
         for i in range(current_index, len(self._files)):
-            filename = self._files[i]
+            file = self._files[i]
             if headers is None:
-                headers = set(self._get_headers(filename))
+                headers = set(self._get_headers(file))
 
-            if headers == set(self._get_headers(filename)):
-                if not self._parse(filename):
+            if headers == set(self._get_headers(file)):
+                if not self._parse(file):
                     break
 
         files = set(self._files)
@@ -208,7 +207,7 @@ class ParserDialog(QDialog):
         else:
             self.accept()
 
-    def exec(self) -> dict[str, ViewModel]:
+    def exec(self) -> dict[Path, ViewModel]:
         self._models.clear()
         self.ui.finish_button.setDisabled(True)
         ret = super().exec()

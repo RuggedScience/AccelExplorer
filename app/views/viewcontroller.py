@@ -104,12 +104,9 @@ class ViewSeries(QObject):
 
     @width.setter
     def width(self, width: int) -> None:
-        try:
-            pen = self._chart_series.pen()
-            pen.setWidth(width)
-            self._chart_series.setPen(pen)
-        except RuntimeError:
-            pass
+        pen = self._chart_series.pen()
+        pen.setWidth(width)
+        self._chart_series.setPen(pen)
 
     @property
     def marker_shape(self) -> MarkerShape:

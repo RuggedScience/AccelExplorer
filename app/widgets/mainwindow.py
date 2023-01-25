@@ -1,17 +1,17 @@
 import dataclasses
 import json
+import logging
 import os
+from pathlib import Path
 from collections.abc import Iterable
 from io import TextIOWrapper
 
-import endaq as ed
 import pandas as pd
-from PySide6.QtCore import QFileInfo, QObject, QSettings, QTimer
+from PySide6.QtCore import QObject, QSettings, QTimer
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
     QDragEnterEvent,
-    QDragMoveEvent,
     QDropEvent,
 )
 from PySide6.QtWidgets import (
@@ -29,7 +29,7 @@ from app.plugins.viewmodelplugin import (
     ViewPlugin,
 )
 from app.plugins.options import BoolOption, ListOption
-from app.plugins.parserplugins import ParserPlugin
+from app.plugins.parserplugins import ParserPlugin, ParseError
 from app.ui.ui_mainwindow import Ui_MainWindow
 from app.utils import SignalBlocker, timing, get_plugin_path
 from app.views import ViewModel, ViewController, ViewSeries
@@ -217,37 +217,33 @@ class MainWindow(QMainWindow):
 
         return controller
 
-    def _add_file(self, fileinfo: QFileInfo | str, model: ViewModel) -> ViewController:
-        if isinstance(fileinfo, str):
-            fileinfo = QFileInfo(fileinfo)
-
-        controller = self._add_view(fileinfo.fileName(), model)
+    def _add_file(self, file: Path, model: ViewModel) -> ViewController:
+        controller = self._add_view(file.name, model)
         # Set the original filename in the tooltip
         # in case the user changes the name later.
-        controller.add_tooltips(f"File: {fileinfo.fileName()}")
+        controller.add_tooltips(f"File: {file.name}")
         return controller
 
-    def _add_files(self, files: Iterable[QFileInfo]) -> None:
+    def _add_files(self, files: Iterable[Path]) -> None:
         unparsed_files = []
         for file in files:
             model = None
-            filename = file.absoluteFilePath()
-            extension = file.suffix().lower()
-            if extension == "csv" and self._parse_exported_file(filename):
-                continue
-            else:
+            extension = get_ext(file)
+            if not self._parse_exported_file(file):
                 for parser in self._parsers:
                     if extension in parser.supported_extensions():
                         try:
-                            model = parser.parse(filename)
+                            model = parser.parse(file)
                             break
-                        except Exception as ex:
+                        except ParseError:
                             pass
+                        except Exception:
+                            logging.exception(__name__)
 
-            if model is not None:
-                self._add_file(file, model)
-            else:
-                unparsed_files.append(filename)
+                if model is not None:
+                    self._add_file(file, model)
+                elif extension == "csv":
+                    unparsed_files.append(file)
 
         if unparsed_files:
             models = ParserDialog(unparsed_files, self).exec()
@@ -255,15 +251,15 @@ class MainWindow(QMainWindow):
                 for file, model in models.items():
                     self._add_file(file, model)
 
-    def _get_supported_files(self, event: QDropEvent) -> list[QFileInfo]:
+    def _get_supported_files(self, event: QDropEvent) -> list[Path]:
         files = []
         mimeData = event.mimeData()
         if mimeData.hasUrls():
             for url in mimeData.urls():
                 if url.isLocalFile():
-                    info = QFileInfo(url.toLocalFile())
-                    if info.suffix().lower() in self.supported_extensions:
-                        files.append(info)
+                    file = Path(url.toLocalFile())
+                    if get_ext(file) in self.supported_extensions:
+                        files.append(file)
         return files
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
@@ -272,10 +268,6 @@ class MainWindow(QMainWindow):
             event.acceptProposedAction()
         else:
             super().dragEnterEvent(event)
-
-    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
-        # event.acceptProposedAction()
-        super().dragMoveEvent(event)
 
     def dropEvent(self, event: QDropEvent) -> None:
         files = self._get_supported_files(event)
@@ -326,12 +318,12 @@ class MainWindow(QMainWindow):
             suggested_name = item.text(0).split(".")[0]
             if self._last_directory:
                 suggested_name = os.path.join(self._last_directory, suggested_name)
-            fileName, filter = QFileDialog.getSaveFileName(
+            filename, filter = QFileDialog.getSaveFileName(
                 self, "Export File", suggested_name, "CSV (*.csv)"
             )
-            if fileName:
-                self._last_directory = os.path.dirname(fileName)
-                with open(fileName, "w") as f:
+            if filename:
+                self._last_directory = os.path.dirname(filename)
+                with open(filename, "w") as f:
                     metadata = ViewMetaData.from_controller(controller)
                     metadata.to_file(f)
                     controller.df.to_csv(f)
@@ -504,7 +496,7 @@ class MainWindow(QMainWindow):
         )
         if files:
             self._last_directory = os.path.dirname(files[0])
-            self._add_files([QFileInfo(filename) for filename in files])
+            self._add_files([Path(filename) for filename in files])
 
     def _view_plugin_triggered(self, plugin: ViewPlugin) -> None:
         controllers = self.ui.treeWidget.get_selected_controllers()
@@ -598,9 +590,12 @@ class MainWindow(QMainWindow):
             elif isinstance(sender.plugin, FilterPlugin):
                 self._filter_plugin_triggered(sender.plugin)
 
-    def _parse_exported_file(self, filename) -> bool:
+    def _parse_exported_file(self, file: Path) -> bool:
+        if get_ext(file) != "csv":
+            return False
+
         try:
-            with open(filename, "r") as f:
+            with file.open("r") as f:
                 metadata = ViewMetaData.from_file(f)
                 if metadata:
                     parse_dates = bool(metadata.index_type == "timedelta64")
@@ -610,13 +605,13 @@ class MainWindow(QMainWindow):
                         df.index = pd.to_timedelta(df.index, unit=None)
 
                     model = ViewModel(df, y_axis=metadata.y_title)
-                    controller = self._add_file(filename, model)
+                    controller = self._add_file(file, model)
                     metadata.to_controller(controller)
                     return True
         # If we couldn't parse it just return False
         # so the parser dialog will handle it.
-        except:
-            pass
+        except Exception:
+            logging.exception(__name__)
         return False
 
 
@@ -723,3 +718,11 @@ class ViewMetaData:
 
         kwargs = json.loads(data)
         return cls(**kwargs)
+
+
+def get_ext(file: Path) -> str:
+    ext = file.suffix.lower()
+    # Drop the "." off the extension name
+    if ext:
+        ext = ext[1:]
+    return ext

@@ -1,6 +1,5 @@
-import os
-from pathlib import Path
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import pandas as pd
 from yapsy.IPlugin import IPlugin
@@ -22,16 +21,8 @@ class ParserPlugin(IPlugin, ABC):
     def supported_extensions() -> tuple[str]:
         pass
 
-    def can_parse(self, filename: str) -> bool:
-        path = Path(filename)
-        return (
-            path.exists()
-            and path.is_file()
-            and path.suffix in self.supported_extensions()
-        )
-
     @abstractmethod
-    def parse(self, filename: str, **kwargs) -> ViewModel:
+    def parse(self, file: Path, **kwargs) -> ViewModel:
         pass
 
 
@@ -40,12 +31,9 @@ class CSVParser(ParserPlugin):
     def supported_extensions() -> tuple[str]:
         return ("csv",)
 
-    def can_parse(self, filename: str) -> bool:
-        return os.path.exists(filename)
-
     def _parse_to_df(
         self,
-        filename: str,
+        file: Path,
         header_row: int = 1,
         index_type: str = None,
         sample_rate: int = None,
@@ -54,7 +42,7 @@ class CSVParser(ParserPlugin):
         if index_type:
             index_type = index_type.lower()
 
-        df = pd.read_csv(filename, header=header_row - 1, **kwargs)
+        df = pd.read_csv(file, header=header_row - 1, **kwargs)
         # Only keep columns with numbers
         df = df.select_dtypes(include=["number"])
         # Drop columns that contain only NaN values
@@ -84,10 +72,10 @@ class CSVParser(ParserPlugin):
 
     def parse(
         self,
-        filename: str,
+        file: Path,
         x_axis_title="",
         y_axis_title="",
         **kwargs,
     ) -> ViewModel:
-        df = self._parse_to_df(filename=filename, **kwargs)
+        df = self._parse_to_df(file=file, **kwargs)
         return ViewModel(df, y_axis=y_axis_title)
