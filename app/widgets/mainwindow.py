@@ -599,20 +599,24 @@ class MainWindow(QMainWindow):
                 self._filter_plugin_triggered(sender.plugin)
 
     def _parse_exported_file(self, filename) -> bool:
-        with open(filename, "r") as f:
-            metadata = ViewMetaData.from_file(f)
-            if metadata:
-                parse_dates = bool(metadata.index_type == "timedelta64")
-                df = pd.read_csv(f, index_col=metadata.index_name)
+        try:
+            with open(filename, "r") as f:
+                metadata = ViewMetaData.from_file(f)
+                if metadata:
+                    parse_dates = bool(metadata.index_type == "timedelta64")
+                    df = pd.read_csv(f, index_col=metadata.index_name)
 
-                if parse_dates:
-                    df.index = pd.to_timedelta(df.index, unit=None)
+                    if parse_dates:
+                        df.index = pd.to_timedelta(df.index, unit=None)
 
-                model = ViewModel(df, y_axis=metadata.y_title)
-                controller = self._add_file(filename, model)
-                metadata.to_controller(controller)
-                return True
-
+                    model = ViewModel(df, y_axis=metadata.y_title)
+                    controller = self._add_file(filename, model)
+                    metadata.to_controller(controller)
+                    return True
+        # If we couldn't parse it just return False
+        # so the parser dialog will handle it.
+        except:
+            pass
         return False
 
 
