@@ -126,10 +126,7 @@ class ViewModel(QObject):
             new_df = other._df[list(new_cols)]
 
             if other.sample_rate != self.sample_rate:
-                try:
-                    end = new_df.index[-1].total_seconds()
-                except AttributeError:
-                    pass
+                end = new_df.index[-1].total_seconds()
                 spacing = 1 / self.sample_rate
                 size = int(end / spacing)
 
@@ -137,7 +134,8 @@ class ViewModel(QObject):
                 new_df = new_df.reindex(new_index, method="nearest")
 
                 # If the sample rates didn't match and we had to
-                # resample the dataframe we can't use the old points.
+                # resample the dataframe we should redraw the new data
+                # so the user can see exactly how the data was modified.
                 other_points = {}
             else:
                 other_points = other._points
@@ -193,7 +191,7 @@ class ViewModel(QObject):
         if series.index.inferred_type == "timedelta64":
             series.index = series.index.total_seconds()
 
-        series = series.astype(float)
+        series = series.astype(float).dropna()
         points = QPointFList()
         points.reserve(series.size)
         for i, v in series.items():
