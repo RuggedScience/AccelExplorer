@@ -166,6 +166,7 @@ class ViewModel(QObject):
         if series.index.inferred_type == "timedelta64":
             series.index = series.index.total_seconds()
 
+        series = series.astype(float)
         points = QPointFList()
         points.reserve(series.size)
         for i, v in series.items():
@@ -174,7 +175,6 @@ class ViewModel(QObject):
 
     def _df_to_points(self, df: pd.DataFrame) -> dict[str, QPointFList]:
         d = {}
-        df = df.astype(float)
         for col, series in df.items():
             d[col] = self._series_to_points(series)
         return d
