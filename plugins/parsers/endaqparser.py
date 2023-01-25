@@ -18,4 +18,4 @@ class EndaqParser(parserplugins.ParserPlugin):
         # Convert index from datetime to timedelta
         series = df.index.to_series()
         df.index = series - series[0]
-        return ViewModel(df, "Acceleration (g)")
+        return ViewModel(df, y_axis="Acceleration (g)")

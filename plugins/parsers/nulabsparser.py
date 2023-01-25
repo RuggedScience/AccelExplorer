@@ -16,9 +16,11 @@ class NULabsCSVParser(parserplugins.CSVParser):
 
     def parse(self, filename: str) -> ViewModel:
         sample_rate = self._get_sample_rate(filename)
-        df = self._parse_to_df(filename=filename, sample_rate=sample_rate, header_row=16)
+        df = self._parse_to_df(
+            filename=filename, sample_rate=sample_rate, header_row=16
+        )
         df = df.iloc[:, 1:]
-        return ViewModel(df, "Acceleration (g)")
+        return ViewModel(df, y_axis="Acceleration (g)")
 
     def _get_sample_rate(self, filename: str) -> int:
         sample_rate_row = linecache.getline(filename, 8).lower()

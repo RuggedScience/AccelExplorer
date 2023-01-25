@@ -90,4 +90,4 @@ class CSVParser(ParserPlugin):
         **kwargs,
     ) -> ViewModel:
         df = self._parse_to_df(filename=filename, **kwargs)
-        return ViewModel(df, y_axis_title)
+        return ViewModel(df, y_axis=y_axis_title)

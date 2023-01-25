@@ -50,7 +50,7 @@ class ViewModel(QObject):
             if name in self._points:
                 points[name] = self._points[name]
 
-        return ViewModel(self._df[key], points)
+        return ViewModel(self._df[key], points=points)
 
     @property
     def df(self) -> pd.DataFrame:
