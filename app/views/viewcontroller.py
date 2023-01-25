@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 from PySide6.QtCharts import QChart, QValueAxis, QLineSeries
 from PySide6.QtCore import QObject, QPointF, Qt, Signal, QTimer
-from PySide6.QtGui import QColor, QUndoStack, QImage
+from PySide6.QtGui import QColor, QUndoStack, QImage, QPainter
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
-from app.utils import MarkerGenerator, MarkerShape, undoable
+from app.utils import MarkerGenerator, MarkerShape, undoable, timing
 from app.widgets import InteractiveChart, ColorWidget
 
 from .viewmodel import ViewModel
@@ -196,6 +196,7 @@ class ViewController(QObject):
         self._tree_item.setFlags(self._tree_item.flags() | Qt.ItemFlag.ItemIsEditable)
         self._undo_stack = QUndoStack(self)
         self._chart_view = InteractiveChart()
+        self._chart_view.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self._chart_view.chart().legend().hide()
 
         self._x_axis = QValueAxis()
@@ -261,18 +262,35 @@ class ViewController(QObject):
 
     @undoable("model", title_arg="title", remove_title_arg=True)
     def set_model(self, model: ViewModel) -> None:
+
+        added_series = []
+        removed_series = []
+
         if self._model is not None:
             self._model.disconnect(self)
+            removed_series = self._model.difference(model)
+
+        if model is not None:
+            model.series_added.connect(self._add_series)
+            model.series_removed.connect(self._remove_series)
+            model.data_changed.connect(self._data_changed)
+            added_series = model.difference(self._model)
 
         self._model = model
-        if self._model is not None:
-            self._model.series_added.connect(self._add_series)
-            self._model.series_removed.connect(self._remove_series)
-            self._model.data_changed.connect(self._data_changed)
-            # self._model.sample_rate_changed.connect(self._update_tooltip)
+
+        # Sync series to the new model keeping any existing series
+        for name in sorted(removed_series):
+            self._remove_series(name)
+
+        for name in sorted(added_series):
+            self._add_series(name)
+
+        all_points = self._model.points
+        for name, points in all_points.items():
+            if name in self and name not in added_series:
+                self[name].points = points
 
         self._update_tooltip()
-        self._sync_to_model()
         self._data_changed()
         self.fit_contents()
 
@@ -481,28 +499,6 @@ class ViewController(QObject):
 
         self._view_series.pop(view_series.tree_item)
         view_series.deleteLater()
-
-    def _sync_points_to_model(self) -> None:
-        all_points = self._model.points
-        for name, points in all_points.items():
-            if name in self:
-                self[name].points = points
-
-    def _sync_to_model(self) -> None:
-        df = self._model.df
-        new_names = {str(col) for col in df}
-        old_names = {s.name for s in self._view_series.values()}
-
-        added_cols = new_names.difference(old_names)
-        removed_cols = old_names.difference(new_names)
-
-        for name in sorted(removed_cols):
-            self._remove_series(name)
-
-        for name in sorted(added_cols):
-            self._add_series(name)
-
-        self._sync_points_to_model()
 
     def _update_tooltip(self) -> None:
         lines = self._tooltip_lines.copy()

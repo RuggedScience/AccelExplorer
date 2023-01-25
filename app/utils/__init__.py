@@ -31,16 +31,19 @@ def get_plugin_path():
     return os.path.join(base_path, "plugins")
 
 
-def timing(f):
-    @wraps(f)
-    def wrap(*args, **kw):
-        ts = time()
-        result = f(*args, **kw)
-        te = time()
-        print(f"{f.__name__} took {te-ts:.2f} sec")
-        return result
+def timing(prefix: str = ""):
+    def inner(f):
+        @wraps(f)
+        def wrap(*args, **kw):
+            ts = time()
+            result = f(*args, **kw)
+            te = time()
+            print(f"{prefix}{f.__name__} took {te-ts:.2f} sec")
+            return result
 
-    return wrap
+        return wrap
+
+    return inner
 
 
 def generate_time_index(sample_rate: int, size: int) -> pd.TimedeltaIndex:

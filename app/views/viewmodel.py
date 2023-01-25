@@ -2,7 +2,7 @@ import pandas as pd
 from endaq.calc.utils import sample_spacing
 from PySide6.QtCore import QObject, QPointF, QPointFList, Signal
 
-from app.utils import generate_time_index
+from app.utils import generate_time_index, timing
 
 
 class ViewModel(QObject):
@@ -109,11 +109,16 @@ class ViewModel(QObject):
         self.series_removed.emit(name)
         self.data_changed.emit()
 
+    def difference(self, other: "ViewModel") -> list[str]:
+        if other is None:
+            return list(self._df.columns)
+        return list(set(self._df.columns).difference(other._df.columns))
+
     def merge(self, other: "ViewModel") -> None:
         if not self.can_merge(other):
             raise ValueError("Cannot merge non matching models")
 
-        new_cols = set(other._df.columns).difference(self._df.columns)
+        new_cols = other.difference(self)
 
         # If this is an empty model just copy other into this one.
         if self.empty:
@@ -123,7 +128,7 @@ class ViewModel(QObject):
         else:
             # We only want to add new columns.
             # merge does not support adding data to already existing columns.
-            new_df = other._df[list(new_cols)]
+            new_df = other._df[new_cols]
 
             if other.sample_rate != self.sample_rate:
                 end = new_df.index[-1].total_seconds()
