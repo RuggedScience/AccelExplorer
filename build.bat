@@ -1,1 +1,0 @@
-pyinstaller.exe --onedir --windowed --hidden-import idelib --hidden-import ebmlite --name "AccelExplorer" --icon="icons\icon.ico" main.py

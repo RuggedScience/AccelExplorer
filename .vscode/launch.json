@@ -5,10 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Accel Explorer",
+            "name": "AccelExplorer",
             "type": "python",
             "request": "launch",
-            "program": "main.py",
+            "module": "app",
+            //"program": "AccelExplorer.py",
             "console": "integratedTerminal",
             "justMyCode": true
         }

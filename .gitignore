@@ -141,3 +141,5 @@ app/ui/*
 # 
 .vscode/*
 !.vscode/launch.json
+
+app/_version.py

@@ -1,29 +1,25 @@
-import logging
+import sys
 import locale
-
 
 from PySide6.QtWidgets import QApplication
 
-from app.version import __version__
+try:
+    from app._version import version
+except ImportError:
+    version = "DEV"
+
 from app.widgets.mainwindow import MainWindow
 
-logging.basicConfig(level=logging.WARN)
 locale.setlocale(locale.LC_ALL, "")
 
 QApplication.setOrganizationName("Rugged Science")
 QApplication.setOrganizationDomain("ruggedscience.com")
 QApplication.setApplicationName("AccelExplorer")
-QApplication.setApplicationVersion(__version__)
+QApplication.setApplicationVersion(version)
 
 
 def run():
-    app = QApplication([])
+    app = QApplication(sys.argv)
     widget = MainWindow()
     widget.show()
-    return app.exec()
-
-
-if __name__ == "__main__":
-    import sys
-
-    sys.exit(run())
+    sys.exit(app.exec())
