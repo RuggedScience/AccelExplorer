@@ -2,7 +2,7 @@ import distutils
 import sys
 from cx_Freeze import setup, Executable
 
-name = "BomDiff"
+name = "AccelExplorer"
 icon = "./icons/icon.ico"
 
 # str(uuid.uuid3(uuid.NAMESPACE_DNS, "accelexplorer.ruggedsci.com")).upper()
