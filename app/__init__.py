@@ -8,7 +8,6 @@ try:
 except ImportError:
     version = "DEV"
 
-from app.widgets.mainwindow import MainWindow
 
 locale.setlocale(locale.LC_ALL, "")
 
@@ -19,6 +18,8 @@ QApplication.setApplicationVersion(version)
 
 
 def run():
+    from app.widgets.mainwindow import MainWindow
+
     app = QApplication(sys.argv)
     widget = MainWindow()
     widget.show()
