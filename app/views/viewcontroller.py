@@ -64,7 +64,7 @@ class ViewSeries(QObject):
     def set_name(self, name: str) -> None:
         if self._name != name:
             if self.model:
-                self.model.rename(self._name, name)
+                self.model.rename({self._name: name})
 
             self._name = name
             self._tree_item.setText(0, name)
