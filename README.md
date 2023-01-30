@@ -5,7 +5,7 @@ The tool ships with some standard functions for generating FFTs, PSDs, and SRSs,
 
 The latest release can be found [HERE](https://github.com/RuggedScience/AccelExplorer/releases/latest)
 
-<img src="docs/Images/AccelExplorerScreenshot.png" alt="AccelExplorer Screenshot" width="600"/>
+<img src="/docs/images/AccelExplorerScreenshot.png" alt="AccelExplorer Screenshot" width="600"/>
 
 ## Features
 - Drag and Drop files.
@@ -25,7 +25,7 @@ To automatically parse files, a plugin must be created for that specific file fo
 
 If no plugin is found that can parse the file, the manual parser dialog will be shown asking for the below information.
 
-<img src="docs/Images/ParserDialogScreenshot.png" alt="Parser Dialog Screenshot"/>
+<img src="/docs/images/ParserDialogScreenshot.png" alt="Parser Dialog Screenshot"/>
 
 ***NOTE:*** *Only CSV files can be parsed using the parser dialog. For any other file types a plugin MUST be created. See [endaqparser.py](./plugins/parsers/endaqparser.py) for an example.*
 
@@ -81,7 +81,7 @@ The columns that should be included in the view. Any unchecked columns will not 
     python3 -m pip install -r requirements.txt
     ```
 - Run AccelExplorer
-    ```
+    ``` console
     python3 main.py
     ```
 
