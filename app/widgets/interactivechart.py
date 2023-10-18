@@ -14,14 +14,14 @@ from .callout import Callout
 
 def control_pressed() -> bool:
     modifiers = QApplication.keyboardModifiers()
-    return modifiers == Qt.ControlModifier
+    return modifiers == Qt.KeyboardModifier.ControlModifier
 
 
 class InteractiveChart(QChartView):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setRubberBand(
-            QChartView.HorizontalRubberBand | QChartView.ClickThroughRubberBand
+            QChartView.RubberBand.RectangleRubberBand | QChartView.RubberBand.ClickThroughRubberBand
         )
 
         self._callouts: list[Callout] = []
@@ -86,21 +86,23 @@ class InteractiveChart(QChartView):
             else:
                 factor = 0.5
 
-            if self.rubberBand() & QChartView.HorizontalRubberBand:
-                self._zoom_x(factor)
-            elif self.rubberBand() & QChartView.VerticalRubberBand:
-                self._zoom_y(factor)
-            elif self.rubberBand() & QChartView.RectangleRubberBand:
+            if self.rubberBand() & QChartView.RubberBand.RectangleRubberBand == QChartView.RubberBand.RectangleRubberBand:
                 self.chart().zoom(factor)
+            else:
+                if self.rubberBand() & QChartView.RubberBand.HorizontalRubberBand:
+                    self._zoom_x(factor)
+                if self.rubberBand() & QChartView.RubberBand.VerticalRubberBand:
+                    self._zoom_y(factor)
+
             event.accept()
             self._update_callouts()
         return super().wheelEvent(event)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MiddleButton or (
-            event.button() == Qt.LeftButton and control_pressed()
+        if event.button() == Qt.MouseButton.MiddleButton or (
+            event.button() == Qt.MouseButton.LeftButton and control_pressed()
         ):
-            QApplication.setOverrideCursor(QCursor(Qt.SizeAllCursor))
+            QApplication.setOverrideCursor(QCursor(Qt.CursorShape.SizeAllCursor))
             self._last_mouse_pos = event.pos()
             event.accept()
         else:
@@ -108,18 +110,13 @@ class InteractiveChart(QChartView):
             return super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if event.buttons() & Qt.MiddleButton or (
-            event.buttons() & Qt.LeftButton and control_pressed()
+        if event.buttons() & Qt.MouseButton.MiddleButton or (
+            event.buttons() & Qt.MouseButton.LeftButton and control_pressed()
         ):
             if self._last_mouse_pos is None:
                 self._last_mouse_pos = event.pos()
 
             d_pos = event.pos() - self._last_mouse_pos
-
-            if self.rubberBand() & QChartView.HorizontalRubberBand:
-                d_pos.setY(0)
-            elif self.rubberBand() & QChartView.VerticalRubberBand:
-                d_pos.setX(0)
 
             d_pos.setX(-d_pos.x())
             self.chart().scroll(d_pos.x(), d_pos.y())
@@ -139,7 +136,7 @@ class InteractiveChart(QChartView):
         self._update_callouts()
 
     def keyReleaseEvent(self, event: QKeyEvent) -> None:
-        if control_pressed() and event.key() == Qt.Key_R:
+        if control_pressed() and event.key() == Qt.Key.Key_R:
             chart = self.chart()
             chart.zoomReset()
 
