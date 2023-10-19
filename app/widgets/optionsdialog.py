@@ -13,7 +13,7 @@ from app.plugins.options import DataOption
 
 
 class OptionsDialog(QDialog):
-    def __init__(self, options: Dict[str, DataOption], parent: QWidget = None) -> None:
+    def __init__(self, options: Dict[str, DataOption], parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
         layout = QVBoxLayout()
@@ -23,7 +23,7 @@ class OptionsDialog(QDialog):
         self._options_manager = OptionsUiManager(form_layout)
         self._options_manager.options = options
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -33,6 +33,6 @@ class OptionsDialog(QDialog):
     def values(self) -> Dict[str, Any]:
         return self._options_manager.values
 
-    def exec(self) -> Dict[str, Any]:
+    def exec(self) -> dict[str, Any] | None:
         if super().exec():
             return self.values

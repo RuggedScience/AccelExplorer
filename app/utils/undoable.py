@@ -11,7 +11,7 @@ class GenericCommand(QUndoCommand):
         title: str,
         undo: Callable[[], None],
         redo: Callable[[], None],
-        parent: QUndoCommand = None,
+        parent: QUndoCommand | None = None,
     ):
         super().__init__(title, parent)
         self._undo = undo
@@ -26,8 +26,8 @@ class GenericCommand(QUndoCommand):
 
 def undoable(
     value_attr: str,
-    title: str = None,
-    title_arg: str | int = None,
+    title: str | None = None,
+    title_arg: str | None = None,
     new_value_arg: str | int = 1,
     remove_title_arg: bool = False,
     undo_stack_attr: str = "undo_stack",
@@ -69,10 +69,6 @@ def undoable(
                         formatted_title = kwargs.get(title_arg, "")
                         if remove_title_arg and title_arg in kwargs:
                             del kwargs[title_arg]
-                    elif isinstance(title_arg, int):
-                        formatted_title = args[title_arg]
-                        if remove_title_arg:
-                            del args[title_arg]
                     else:
                         raise TypeError(
                             f"title_arg must be string or int, not {type(title_arg)}"

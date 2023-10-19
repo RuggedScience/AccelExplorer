@@ -21,7 +21,7 @@ class ViewsTreeWidget(QTreeWidget):
 
     current_view_color = QColor(235, 177, 133)
 
-    def __init__(self, parent: Optional[QWidget] = ...) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
         self.viewport().setMouseTracking(True)
@@ -72,9 +72,9 @@ class ViewsTreeWidget(QTreeWidget):
 
         return super().mouseMoveEvent(event)
 
-    def _drop_is_valid(self, controller: ViewController) -> bool:
+    def _drop_is_valid(self, controller: ViewController | None) -> bool:
         return (
-            controller
+            controller is not None
             and controller not in self.get_selected_controllers()
             and controller.model.can_merge(self._drag_model)
         )
@@ -88,6 +88,7 @@ class ViewsTreeWidget(QTreeWidget):
                 if not controller.tree_item.isSelected():
                     cols = []
                     for col in model.df:
+                        col = str(col)
                         if col in controller:
                             if controller[col].tree_item.isSelected():
                                 cols.append(col)
@@ -115,10 +116,10 @@ class ViewsTreeWidget(QTreeWidget):
     def dropEvent(self, event: QDropEvent) -> None:
         drop_item = self.itemAt(event.pos())
         drop_controller = self.get_controller(drop_item)
-        if self._drop_is_valid(drop_controller):
-            model = drop_controller.model.copy()
+        if self._drop_is_valid(drop_controller) and self._drag_model is not None:
+            model = drop_controller.model.copy() # type: ignore
             model.merge(self._drag_model)
-            drop_controller.set_model(model, title="Combined views")
+            drop_controller.set_model(model, title="Combined views") #type: ignore
             event.acceptProposedAction()
             self.setCurrentItem(drop_item)
 
@@ -138,7 +139,7 @@ class ViewsTreeWidget(QTreeWidget):
                     series = controller[item]
                     series.set_name(item.text(0))
                     controller[item].chart_series.setVisible(
-                        item.checkState(0) == Qt.Checked
+                        item.checkState(0) == Qt.CheckState.Checked
                     )
 
     def _current_item_changed(self, current: QTreeWidgetItem, _) -> None:
@@ -166,7 +167,7 @@ class ViewsTreeWidget(QTreeWidget):
             item = item.parent()
         return item
 
-    def get_controller(self, item: QTreeWidgetItem) -> ViewController:
+    def get_controller(self, item: QTreeWidgetItem) -> ViewController | None:
         if item not in self._controllers:
             item = self._get_root_parent(item)
 
@@ -174,7 +175,7 @@ class ViewsTreeWidget(QTreeWidget):
             return self._controllers.get(item)
         return None
 
-    def get_current_controller(self) -> ViewController:
+    def get_current_controller(self) -> ViewController | None:
         return self.get_controller(self.currentItem())
 
     def get_selected_controllers(self) -> list[ViewController]:

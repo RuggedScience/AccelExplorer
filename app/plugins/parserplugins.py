@@ -35,14 +35,24 @@ class CSVParser(ParserPlugin):
         self,
         file: Path,
         header_row: int = 1,
-        index_type: str = None,
-        sample_rate: int = None,
+        index_type: str | None = None,
+        sample_rate: int | None = None,
         **kwargs,
     ) -> pd.DataFrame:
         if index_type:
             index_type = index_type.lower()
 
-        df = pd.read_csv(file, header=header_row - 1, **kwargs)
+        try:
+            df = pd.read_csv(file, header=header_row - 1, quoting=3, **kwargs)
+        except UnicodeDecodeError:
+            df = pd.read_csv(file, header=header_row - 1, quoting=3, encoding='iso-8859-1', **kwargs)
+        
+
+         # Replace known boolean strings
+        for col in df:
+            df[col].replace(('Yes', 'No'), (1, 0), inplace=True)
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
         # Only keep columns with numbers
         df = df.select_dtypes(include=["number"])
         # Drop columns that contain only NaN values
@@ -62,7 +72,7 @@ class CSVParser(ParserPlugin):
             if index_type == "timestamp":
                 time_units = None
 
-            index = pd.to_timedelta(df.index, unit=time_units)
+            index = pd.to_timedelta(df.index, unit=time_units) #type: ignore
             index = index - index[0]
             df.set_index(index, inplace=True)
         if df.index.inferred_type == "timedelta64":

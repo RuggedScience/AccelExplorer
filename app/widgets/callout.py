@@ -116,11 +116,8 @@ class Callout(QGraphicsItem):
     def set_text(self, text: str) -> None:
         self._text = text
         metrics = QFontMetrics(self._font)
-        self._textRect = QRectF(
-            metrics.boundingRect(
-                QRect(0.0, 0.0, 150.0, 150.0), Qt.AlignLeft, self._text
-            )
-        )
+        boundingRect = metrics.boundingRect(0, 0, 150, 150, Qt.AlignmentFlag.AlignLeft, self._text) #type: ignore
+        self._textRect = QRectF(boundingRect)
         self._textRect.translate(5, 5)
         self.prepareGeometryChange()
         self._rect = self._textRect.adjusted(-5, -5, 5, 5)
@@ -139,8 +136,8 @@ class Callout(QGraphicsItem):
         event.setAccepted(True)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        if event.buttons() & Qt.LeftButton:
-            pos = self.mapToParent(event.pos() - event.buttonDownPos(Qt.LeftButton))
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            pos = self.mapToParent(event.pos() - event.buttonDownPos(Qt.MouseButton.LeftButton))
             self._custom_offset = pos - self.anchor
 
             self.setPos(pos)

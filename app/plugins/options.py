@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from numbers import Number
 
 
 @dataclass
@@ -9,9 +8,9 @@ class DataOption:
 
 @dataclass
 class NumericOption(DataOption):
-    value: Number
-    min: Number
-    max: Number
+    value: int | float
+    min: int | float
+    max: int | float
 
 
 @dataclass
@@ -24,7 +23,7 @@ class ListOptionPair:
 class ListOption(DataOption):
     options: list[ListOptionPair]
 
-    def value_to_name(self, value: str) -> str:
+    def value_to_name(self, value: str) -> str | None:
         for option in self.options:
             if option.value == value:
                 return option.name

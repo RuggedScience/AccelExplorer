@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 from PySide6.QtCharts import QChart, QValueAxis, QLineSeries
-from PySide6.QtCore import QObject, QPointF, Qt, Signal, QTimer
+from PySide6.QtCore import QObject, QPointF, QPointFList, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QUndoStack, QImage, QPainter
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
-from app.utils import MarkerGenerator, MarkerShape, undoable, timing
+from app.utils import MarkerGenerator, MarkerShape, undoable
 from app.widgets import InteractiveChart, ColorWidget
 
 from .viewmodel import ViewModel
@@ -17,12 +19,12 @@ class ViewSeries(QObject):
     def __init__(
         self,
         name: str,
-        parent: "ViewController" = None,
+        parent: ViewController,
     ) -> None:
         super().__init__()
 
         self._chart_series = QLineSeries()
-        self._chart_series.colorChanged.connect(self._color_changed)
+        self._chart_series.colorChanged.connect(self._color_changed) # type: ignore
 
         self._color_widget = None
 
@@ -32,29 +34,27 @@ class ViewSeries(QObject):
         self._name = ""
         self._marker_shape = None
 
-        self.set_name(name, undo=False)
+        self.setParent(parent)
+        self.set_name(name, undo=False) # type: ignore
         self.marker_size = 15
         self._update_marker_image()
 
-        self.setParent(parent)
-
-    def setParent(self, parent: "ViewController") -> None:
+    def setParent(self, parent: ViewController) -> None:
         assert isinstance(parent, ViewController)
+        self._parent = parent
 
         parent.tree_item.addChild(self._tree_item)
         self.undo_stack = parent.undo_stack
         self._parent_changed()
-
         super().setParent(parent)
 
     @property
-    def controller(self) -> "ViewController":
-        return self.parent()
-
+    def controller(self) -> ViewController:
+        return self._parent
+    
     @property
     def model(self) -> ViewModel:
-        if self.controller:
-            return self.controller.model
+        return self.controller.model
 
     @property
     def name(self) -> str:
@@ -63,8 +63,7 @@ class ViewSeries(QObject):
     @undoable("name", title="Renamed series from {old_value} to {new_value}")
     def set_name(self, name: str) -> None:
         if self._name != name:
-            if self.model:
-                self.model.rename({self._name: name})
+            self.model.rename({self._name: name})
 
             self._name = name
             self._tree_item.setText(0, name)
@@ -79,12 +78,12 @@ class ViewSeries(QObject):
         return self._tree_item
 
     @property
-    def points(self) -> list[QPointF]:
+    def points(self) -> list[QPointF] | QPointFList:
         return self._chart_series.points()
 
     @points.setter
-    def points(self, points: list[QPointF]) -> None:
-        self.chart_series.replace(points)
+    def points(self, points: list[QPointF] | QPointFList) -> None:
+        self.chart_series.replace(points) #type: ignore
 
     @property
     def color(self) -> QColor:
@@ -109,7 +108,7 @@ class ViewSeries(QObject):
         self._chart_series.setPen(pen)
 
     @property
-    def marker_shape(self) -> MarkerShape:
+    def marker_shape(self) -> MarkerShape | None:
         return self._marker_shape
 
     @marker_shape.setter
@@ -174,13 +173,12 @@ class ViewController(QObject):
         name: str,
         model: ViewModel,
         display_markers: bool = False,
-        item_parent: QTreeWidget | QTreeWidgetItem = None,
-        parent: QObject = None,
+        item_parent: QTreeWidget | QTreeWidgetItem | None = None,
+        parent: QObject | None = None,
     ):
         super().__init__(parent)
-        self._name = None
-        self._model = None
-        self._tooltip_lines = []
+        self._name: str | None = None
+        self._tooltip_lines: list[str] = []
         self._view_series: dict[QTreeWidgetItem, ViewSeries] = {}
 
         self._series_width = 1
@@ -202,12 +200,12 @@ class ViewController(QObject):
         self._x_axis.setTitleText(model.x_axis)
         self._y_axis.setTitleText(model.y_axis)
 
-        self.chart.addAxis(self._x_axis, Qt.AlignBottom)
-        self.chart.addAxis(self._y_axis, Qt.AlignLeft)
+        self.chart.addAxis(self._x_axis, Qt.AlignmentFlag.AlignBottom)
+        self.chart.addAxis(self._y_axis, Qt.AlignmentFlag.AlignLeft)
 
         self.set_item_parent(item_parent)
-        self.set_model(model, undo=False)
-        self.set_name(name, undo=False)
+        self.set_model(model, undo=False) # type: ignore
+        self.set_name(name, undo=False) # type: ignore
 
         # Wait until after we adjust the ranges to start monitoring them
         self._x_axis.rangeChanged.connect(self._axis_range_changed)
@@ -243,7 +241,7 @@ class ViewController(QObject):
         return len(self._view_series)
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         return self._name
 
     @undoable("name", title="Renamed from {old_value} to {new_value}")
@@ -263,16 +261,16 @@ class ViewController(QObject):
         added_series = []
         removed_series = []
 
-        if self._model is not None:
+        if hasattr(self, '_model'):
             self._model.disconnect(self)
-            removed_series = self._model.difference(model)
-
-        if model is not None:
-            model.series_added.connect(self._add_series)
-            model.series_removed.connect(self._remove_series)
-            model.data_changed.connect(self._data_changed)
             added_series = model.difference(self._model)
+            removed_series = self._model.difference(model)
+        else:
+            added_series = model.difference(None)
 
+        model.series_added.connect(self._add_series)
+        model.series_removed.connect(self._remove_series)
+        model.data_changed.connect(self._data_changed)
         self._model = model
 
         # Sync series to the new model keeping any existing series
@@ -298,7 +296,7 @@ class ViewController(QObject):
         self._tooltip_lines += tooltips
         self._update_tooltip()
 
-    def set_item_parent(self, parent: QTreeWidget | QTreeWidgetItem) -> None:
+    def set_item_parent(self, parent: QTreeWidget | QTreeWidgetItem | None) -> None:
         old_parent = self._tree_item.parent() or self._tree_item.treeWidget()
         if old_parent is not None:
             old_parent.removeChild(self._tree_item)
@@ -410,7 +408,7 @@ class ViewController(QObject):
             new_df.index = series - series[0]
 
         new_model = ViewModel(new_df)
-        self.set_model(new_model, title="Crop")
+        self.set_model(new_model, title="Crop") #type: ignore
 
     def fit_contents(self) -> None:
         # Get a list of visible series
@@ -424,7 +422,7 @@ class ViewController(QObject):
             return
 
         # Create a dataframe with only the visible data
-        df = self.model.df[cols]
+        df = self._model.df[cols]
         # Drop rows missing all data. This gives us accurate
         # min/max values for our visible series.
         df = df.dropna(how="all")
@@ -449,11 +447,16 @@ class ViewController(QObject):
 
     def _point_hovered(self, pos: QPointF, state: bool) -> None:
         if state:
-            x_title = self.chart.axisX().titleText()
-            y_title = self.chart.axisY().titleText()
+            sender = self.sender()
+            if isinstance(sender, QLineSeries):
+                series_name = sender.name() + "\n"
+            else:
+                series_name = ""
+            x_title = self.chart.axisX().titleText() or 'X'
+            y_title = self.chart.axisY().titleText() or 'Y'
             self.chart_view.show_tooltip(
                 pos,
-                f"{x_title}: {pos.x():.2f}\n{y_title}: {pos.y():.2f}",
+                f"{series_name}{x_title}: {pos.x():.2f}\n{y_title}: {pos.y():.2f}",
             )
         else:
             self.chart_view.tooltip.hide()
@@ -473,10 +476,10 @@ class ViewController(QObject):
         chart_series.clicked.connect(self.chart_view.keep_tooltip)
 
         tree_item = view_series.tree_item
-        tree_item.setCheckState(0, Qt.Checked)
+        tree_item.setCheckState(0, Qt.CheckState.Checked)
 
         view_series.width = self._series_width
-        view_series.points = self.model.points[name]
+        view_series.points = self._model.points[name]
 
         self._view_series[tree_item] = view_series
 
@@ -499,16 +502,16 @@ class ViewController(QObject):
 
     def _update_tooltip(self) -> None:
         lines = self._tooltip_lines.copy()
-        lines.append(f"Points: {self.model.shape[0]:n}")
-        if self.model.sample_rate:
-            lines.append(f"Sample Rate: {int(self.model.sample_rate):n}hz")
+        lines.append(f"Points: {self._model.shape[0]:n}")
+        if self._model.sample_rate:
+            lines.append(f"Sample Rate: {int(self._model.sample_rate):n}hz")
 
         self._tree_item.setToolTip(0, "\n".join(lines))
 
     def _data_changed(self) -> None:
         self._update_tooltip()
         # Use OpenGL with larger datasets
-        use_opengl = self.model.size > 50000
+        use_opengl = self._model.size > 500000
         for series in self:
             cs = series.chart_series
             if cs.useOpenGL() != use_opengl:
@@ -547,7 +550,7 @@ class ViewController(QObject):
         if self._display_markers:
             self._update_marker_points()
 
-    def _get_series_from_name(self, name: str) -> ViewSeries:
+    def _get_series_from_name(self, name: str) -> ViewSeries | None:
         for s in self._view_series.values():
             if s.name == name:
                 return s

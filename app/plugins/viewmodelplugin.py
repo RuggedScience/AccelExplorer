@@ -15,7 +15,7 @@ class ViewModelPlugin(IPlugin, ABC):
         pass
 
     @property
-    def icon(self) -> str | QIcon:
+    def icon(self) -> QIcon | None:
         return None
 
     @property

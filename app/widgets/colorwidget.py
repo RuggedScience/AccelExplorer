@@ -17,7 +17,7 @@ class ColorWidget(QWidget):
         round: bool = False,
         size: QSize = QSize(16, 16),
         border_width: int = 2,
-        border_color: QColor = QColor(Qt.black),
+        border_color: QColor = QColor(Qt.GlobalColor.black),
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -65,7 +65,7 @@ class ColorWidget(QWidget):
         self._widget.border_color = color
 
     def mousePressEvent(self, event: "QMouseEvent") -> None:
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._clicked = True
         return super().mousePressEvent(event)
 
@@ -83,11 +83,10 @@ class _ColorWidget(QFrame):
     ) -> None:
         super().__init__(parent)
         self._round = round
-        self._color = None
         self.color = color
 
         self._border_width = 0
-        self._border_color = QColor(Qt.black)
+        self._border_color = QColor(Qt.GlobalColor.black)
 
     @property
     def color(self) -> QColor:
@@ -95,7 +94,7 @@ class _ColorWidget(QFrame):
 
     @color.setter
     def color(self, color: QColor) -> None:
-        if color != self._color:
+        if not hasattr(self, "_color") or color != self._color:
             self._color = color
             pal = self.palette()
             pal.setColor(pal.ColorRole.Window, color)
@@ -127,7 +126,7 @@ class _ColorWidget(QFrame):
 
     def paintEvent(self, _: QPaintEvent) -> None:
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         pal = self.palette()
         path = QPainterPath()
         pen = QPen(self._border_color, self._border_width)

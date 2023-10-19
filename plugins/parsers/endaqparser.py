@@ -13,8 +13,8 @@ class EndaqParser(parserplugins.ParserPlugin):
 
     def parse(self, filename: str, **kwargs) -> ViewModel:
         df = ed.endaq.ide.get_primary_sensor_data(
-            name=filename, measurement_type=ed.ide.ACCELERATION
-        )
+            name=filename, measurement_type=ed.ide.ACCELERATION #type: ignore
+        ) #type: ignore
         # Convert index from datetime to timedelta
         series = df.index.to_series()
         df.index = series - series[0]

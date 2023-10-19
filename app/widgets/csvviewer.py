@@ -25,7 +25,7 @@ class LineNumberArea(QWidget):
 class CSVViewer(QPlainTextEdit):
     lineNumberChanged = Signal(int)
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
 
         self._lineNumberArea = LineNumberArea(self)
@@ -34,7 +34,7 @@ class CSVViewer(QPlainTextEdit):
         self.updateRequest.connect(self.updateLineNumberArea)
         self.cursorPositionChanged.connect(self._handle_cursor_changed)
 
-        self.viewport().setCursor(Qt.ArrowCursor)
+        self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
         self.updateLineNumberAreaWidth(0)
         self._line_number = None
 
@@ -54,7 +54,7 @@ class CSVViewer(QPlainTextEdit):
 
     def lineNumberAreaPaintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self._lineNumberArea)
-        painter.fillRect(event.rect(), Qt.lightGray)
+        painter.fillRect(event.rect(), Qt.GlobalColor.lightGray)
 
         block = self.firstVisibleBlock()
         blockNumber = block.blockNumber()
@@ -66,13 +66,13 @@ class CSVViewer(QPlainTextEdit):
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 number = str(blockNumber + 1)
-                painter.setPen(Qt.black)
+                painter.setPen(Qt.GlobalColor.black)
                 painter.drawText(
                     0,
                     top,
                     self._lineNumberArea.width(),
                     self.fontMetrics().height(),
-                    Qt.AlignRight,
+                    Qt.AlignmentFlag.AlignRight,
                     number,
                 )
 
@@ -117,10 +117,10 @@ class CSVViewer(QPlainTextEdit):
         extraSelections = []
 
         selection = QTextEdit.ExtraSelection()
-        lineColor = QColor(Qt.yellow).lighter(160)
+        lineColor = QColor(Qt.GlobalColor.yellow).lighter(160)
 
-        selection.format.setBackground(lineColor)
-        selection.format.setProperty(QTextFormat.FullWidthSelection, True)
+        selection.format.setBackground(lineColor) #type: ignore
+        selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True) #type: ignore
 
         cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
         cursor.movePosition(
@@ -131,7 +131,7 @@ class CSVViewer(QPlainTextEdit):
             QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor
         )
 
-        selection.cursor = cursor
+        selection.cursor = cursor #type: ignore
 
         extraSelections.append(selection)
 

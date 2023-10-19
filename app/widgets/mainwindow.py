@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import json
 import logging
@@ -19,6 +21,7 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QFileDialog,
     QMainWindow,
+    QDoubleSpinBox,
     QSpinBox,
 )
 from yapsy.PluginManager import PluginManager
@@ -105,20 +108,20 @@ class MainWindow(QMainWindow):
         self.restoreGeometry(settings.value("geometry"))
         self.restoreState(settings.value("state"))
 
-        self._marker_size = settings.value("marker_size", 10)
-        self._marker_count = settings.value("marker_count", 5)
+        self._marker_size = int(settings.value("marker_size", 10)) #type: ignore
+        self._marker_count = int(settings.value("marker_count", 5)) #type: ignore
 
-        self._x_minor_ticks = settings.value("x_minor_ticks", 0)
-        self._x_major_ticks = settings.value("x_major_ticks", 5)
+        self._x_minor_ticks = int(settings.value("x_minor_ticks", 0)) #type: ignore
+        self._x_major_ticks = int(settings.value("x_major_ticks", 5)) #type: ignore
 
-        self._y_minor_ticks = settings.value("y_minor_ticks", 0)
-        self._y_major_ticks = settings.value("y_major_ticks", 5)
-        self._series_width = settings.value("series_width", 2)
-        self._selected_series_width = settings.value("selected_series_width", 5)
+        self._y_minor_ticks = int(settings.value("y_minor_ticks", 0)) #type: ignore
+        self._y_major_ticks = int(settings.value("y_major_ticks", 5)) #type: ignore
+        self._series_width = int(settings.value("series_width", 2)) #type: ignore
+        self._selected_series_width = int(settings.value("selected_series_width", 5))  # type: ignore
 
         self.ui.selectedSeriesWidth_spin.setValue(self._selected_series_width)
 
-        self._last_directory = settings.value("last_directory", "")
+        self._last_directory = str(settings.value("last_directory", ""))
 
     def _save_settings(self) -> None:
         settings = QSettings()
@@ -287,7 +290,8 @@ class MainWindow(QMainWindow):
         # If there is no selection, close the current view
         if not controllers:
             current_controller = self.ui.treeWidget.get_current_controller()
-            self._close_view(current_controller)
+            if current_controller is not None:
+                self._close_view(current_controller)
         else:
             for controller in controllers:
                 # If the root tree item is selected just close the entire view
@@ -309,7 +313,7 @@ class MainWindow(QMainWindow):
                     # create a new model with those columns.
                     elif len(cols) != len(controller):
                         new_model = controller.model[cols]
-                        controller.set_model(new_model, title="Removed series")
+                        controller.set_model(new_model, title="Removed series") #type: ignore
 
     def _export_current_view(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -394,10 +398,10 @@ class MainWindow(QMainWindow):
         if current:
             current.width = self.ui.selectedSeriesWidth_spin.value()
 
-    def _set_value_silent(self, spin_box: QSpinBox, value: float) -> None:
+    def _set_value_silent(self, spin_box: QSpinBox | QDoubleSpinBox, value: float | int) -> None:
         if not spin_box.hasFocus():
             with SignalBlocker(spin_box):
-                spin_box.setValue(value)
+                spin_box.setValue(value) #type: ignore
 
     def _update_chart_settings(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
@@ -424,9 +428,8 @@ class MainWindow(QMainWindow):
     def _current_view_changed(
         self,
         current: ViewController,
-        previous: ViewController = None,
+        previous: ViewController | None = None,
     ) -> None:
-
         if previous:
             x_axis = previous.x_axis
             y_axis = previous.y_axis
@@ -579,7 +582,7 @@ class MainWindow(QMainWindow):
                 # Remove trailing comma
                 title = title[:-1]
                 title += ")"
-                controller.set_model(model, title=title)
+                controller.set_model(model, title=title) #type: ignore
 
     def _plugin_action_triggered(self) -> None:
         sender = self.sender()
@@ -617,7 +620,7 @@ class MainWindow(QMainWindow):
 
 class DataframePluginAction(QAction):
     def __init__(
-        self, plugin: ViewModelPlugin, description: str = None, parent: QObject = None
+        self, plugin: ViewModelPlugin, description: str = "", parent: QObject | None = None
     ):
         super().__init__(plugin.name, parent)
         self.setToolTip(description)
@@ -654,7 +657,7 @@ class ViewMetaData:
     series: dict[str, dict]
 
     def to_controller(self, controller: ViewController) -> None:
-        controller.set_name(self.name, undo=False)
+        controller.set_name(self.name, undo=False) #type: ignore
         controller.x_axis.setTitleText(self.x_title)
         controller.x_axis.setMinorTickCount(self.x_minor_ticks)
         controller.x_axis.setTickCount(self.x_major_ticks)
@@ -695,7 +698,7 @@ class ViewMetaData:
             "series": {
                 series.name: {
                     "color": series.color.name(),
-                    "shape": series.marker_shape.value,
+                    "shape": series.marker_shape.value if series.marker_shape else None,
                 }
                 for series in controller
             },
@@ -703,7 +706,7 @@ class ViewMetaData:
         return cls(**kwargs)
 
     @classmethod
-    def from_file(cls, file: TextIOWrapper) -> "ViewMetaData":
+    def from_file(cls, file: TextIOWrapper) -> ViewMetaData | None:
         data = ""
         for i, line in enumerate(file):
             if i == 0:

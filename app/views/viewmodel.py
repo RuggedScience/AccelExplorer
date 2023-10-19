@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import pandas as pd
 from endaq.calc.utils import sample_spacing
 from PySide6.QtCore import QObject, QPointF, QPointFList, Signal
 
-from app.utils import generate_time_index, timing
+from app.utils import generate_time_index
 
 
 class ViewModel(QObject):
@@ -16,9 +18,9 @@ class ViewModel(QObject):
         self,
         df: pd.DataFrame = pd.DataFrame(),
         y_axis: str = "",
-        x_axis: str = None,
-        points: dict[str, QPointFList] = None,
-        parent: QObject = None,
+        x_axis: str | None = None,
+        points: dict[str, QPointFList] | None = None,
+        parent: QObject | None = None,
         lazy: bool = True,
     ):
         super().__init__(parent)
@@ -29,7 +31,7 @@ class ViewModel(QObject):
         self._y_axis = y_axis
         self._x_axis = x_axis
         self._points: dict[str, QPointFList] = {}
-        self._sample_rate = None
+        self._sample_rate: int = 0
 
         self._update_sample_rate()
 
@@ -39,7 +41,7 @@ class ViewModel(QObject):
         else:
             self._points = points.copy()
 
-    def __getitem__(self, key) -> "ViewModel":
+    def __getitem__(self, key: str | list[str]) -> "ViewModel":
         key = list(key)
 
         points = {}
@@ -83,7 +85,7 @@ class ViewModel(QObject):
         # Lazyily generate the points
         for col, series in self._df.items():
             if col not in self._points:
-                self._points[col] = self._series_to_points(series)
+                self._points[str(col)] = self._series_to_points(series)
 
         return self._points.copy()
 
@@ -92,7 +94,7 @@ class ViewModel(QObject):
         return self._df.empty
 
     @property
-    def sample_rate(self) -> float:
+    def sample_rate(self) -> int:
         return self._sample_rate
 
     def copy(self) -> "ViewModel":
@@ -109,12 +111,12 @@ class ViewModel(QObject):
         self.series_removed.emit(name)
         self.data_changed.emit()
 
-    def difference(self, other: "ViewModel") -> list[str]:
+    def difference(self, other: ViewModel | None) -> list[str]:
         if other is None:
             return list(self._df.columns)
         return list(set(self._df.columns).difference(other._df.columns))
 
-    def merge(self, other: "ViewModel") -> None:
+    def merge(self, other: ViewModel) -> None:
         if not self.can_merge(other):
             raise ValueError("Cannot merge non matching models")
 
@@ -130,6 +132,7 @@ class ViewModel(QObject):
             # merge does not support adding data to already existing columns.
             new_df = other._df[new_cols]
 
+            # TODO: What happens if the sample rate is empty on either model?
             if other.sample_rate != self.sample_rate:
                 end = new_df.index[-1].total_seconds()
                 spacing = 1 / self.sample_rate
@@ -159,18 +162,19 @@ class ViewModel(QObject):
 
         self.data_changed.emit()
 
-    def can_merge(self, other: "ViewModel") -> bool:
+    def can_merge(self, other: ViewModel | None) -> bool:
         if self.empty:
             return True
 
         return (
-            self._df.index.inferred_type == other._df.index.inferred_type
+            other is not None
+            and self._df.index.inferred_type == other._df.index.inferred_type
             # We can't merge two models with the same series names
             and not bool(set(self._df.columns).intersection(other._df))
         )
 
     def add_suffix(self, suffix: str) -> None:
-        columns = {col: col + suffix for col in self._df}
+        columns = {str(col): str(col) + suffix for col in self._df}
         self.rename(columns)
 
     def rename(self, columns: dict[str, str]) -> None:
@@ -184,9 +188,9 @@ class ViewModel(QObject):
     def _update_sample_rate(self) -> None:
         spacing = sample_spacing(self._df)
         if self.index_type == "timedelta64" and spacing:
-            sample_rate = 1 / spacing
+            sample_rate = int(1 / spacing)
         else:
-            sample_rate = None
+            sample_rate = 0
 
         if sample_rate != self._sample_rate:
             self._sample_rate = sample_rate
@@ -194,13 +198,13 @@ class ViewModel(QObject):
 
     def _series_to_points(self, series: pd.Series) -> QPointFList:
         if series.index.inferred_type == "timedelta64":
-            series.index = series.index.total_seconds()
+            series.index = series.index.total_seconds() #type: ignore
 
         series = series.astype(float).dropna()
         points = QPointFList()
-        points.reserve(series.size)
+        points.reserve(series.size) #type: ignore
         for i, v in series.items():
-            points.append(QPointF(i, v))
+            points.append(QPointF(i, v)) #type: ignore
         return points
 
     def _df_to_points(self, df: pd.DataFrame) -> dict[str, QPointFList]:

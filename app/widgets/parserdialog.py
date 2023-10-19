@@ -2,7 +2,6 @@ import linecache
 from collections.abc import Iterable
 from pathlib import Path
 
-from PySide6.QtCore import QFileInfo
 from PySide6.QtWidgets import QCheckBox, QDialog, QMessageBox, QWidget
 
 from app.plugins.parserplugins import CSVParser, ParseError
@@ -14,7 +13,7 @@ class ParserDialog(QDialog):
     def __init__(
         self,
         files: list[Path],
-        parent: QWidget = None,
+        parent: QWidget | None = None,
     ) -> None:
         if not isinstance(files, Iterable):
             files = [files]
@@ -49,7 +48,7 @@ class ParserDialog(QDialog):
     def _current_file(self) -> Path:
         return self._files[self._file_index]
 
-    def set_files(self, files: Iterable[str]) -> None:
+    def set_files(self, files: Iterable[Path]) -> None:
         self._file_index = 0
         self._previous_headers = []
         self._files: list[Path] = list(files)
@@ -94,6 +93,7 @@ class ParserDialog(QDialog):
 
     def _get_headers(self, file: Path) -> list[str]:
         lineno = self.ui.headerRowSpinBox.value()
+
         headers = linecache.getline(str(file), lineno).strip().split(",")
         # Remove blank headers
         return [header for header in headers if header]
@@ -176,7 +176,7 @@ class ParserDialog(QDialog):
         self._skipped_files.add(self._current_file)
         self._set_next_file()
 
-    def _parse_next(self) -> bool:
+    def _parse_next(self) -> None:
         file = self._current_file
         if self._parse(file):
             if not self._set_next_file():
@@ -207,7 +207,7 @@ class ParserDialog(QDialog):
         else:
             self.accept()
 
-    def exec(self) -> dict[Path, ViewModel]:
+    def exec(self) -> dict[Path, ViewModel] | None:
         self._models.clear()
         self.ui.finish_button.setDisabled(True)
         ret = super().exec()

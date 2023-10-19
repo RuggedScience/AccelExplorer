@@ -20,7 +20,7 @@ class OptionsUiManager:
         self._callback = None
 
     @property
-    def change_callback(self) -> Callable:
+    def change_callback(self) -> Callable | None:
         return self._callback
 
     @change_callback.setter
@@ -28,7 +28,7 @@ class OptionsUiManager:
         for widget in self._widgets.values():
             if isinstance(widget, QComboBox):
                 if self._callback:
-                    widget.currentTextChanged.diconnect(self._callback)
+                    widget.currentTextChanged.diconnect(self._callback) #type: ignore
                 widget.currentTextChanged.connect(callback)
             elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                 if self._callback:
@@ -59,11 +59,15 @@ class OptionsUiManager:
 
                 if isinstance(v.value, int):
                     widget = QSpinBox()
+                    widget.setRange(int(min), int(max))
+                    widget.setValue(v.value)
                 elif isinstance(v.value, float):
                     widget = QDoubleSpinBox()
+                    widget.setRange(float(min), float(max))
+                    widget.setValue(v.value)
+                else:
+                    raise TypeError("Numeric options must be either int or float types")
 
-                widget.setRange(min, max)
-                widget.setValue(v.value)
                 if self._callback:
                     widget.valueChanged.connect(self._callback)
             elif isinstance(v, ListOption):
@@ -74,6 +78,8 @@ class OptionsUiManager:
             elif isinstance(v, BoolOption):
                 widget = QCheckBox()
                 widget.setChecked(v.checked)
+            else:
+                raise TypeError("Invalid option type")
 
             self._layout.addRow(v.name, widget)
             self._widgets[k] = widget
@@ -86,8 +92,11 @@ class OptionsUiManager:
             if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                 value = widget.value()
             elif isinstance(widget, QComboBox):
+                list_option = self._options[k]
+                assert isinstance(list_option, ListOption)
+
                 text = widget.currentText()
-                options = self._options[k].options
+                options = list_option.options
                 for option in options:
                     if option.name == text:
                         value = option.value
