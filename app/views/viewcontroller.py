@@ -405,7 +405,7 @@ class ViewController(QObject):
         # dragging and dropping new series.
         if new_df.index.inferred_type == "timedelta64":
             series = new_df.index.to_series()
-            new_df.index = series - series[0]
+            new_df.index = series - series.iloc[0]
 
         new_model = ViewModel(new_df)
         self.set_model(new_model, title="Crop") #type: ignore
