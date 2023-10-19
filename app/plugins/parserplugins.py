@@ -42,15 +42,9 @@ class CSVParser(ParserPlugin):
         if index_type:
             index_type = index_type.lower()
 
-        try:
-            df = pd.read_csv(file, header=header_row - 1, quoting=3, **kwargs)
-        except UnicodeDecodeError:
-            df = pd.read_csv(file, header=header_row - 1, quoting=3, encoding='iso-8859-1', **kwargs)
+        df = pd.read_csv(file, header=header_row - 1, **kwargs)
         
-
-         # Replace known boolean strings
         for col in df:
-            df[col].replace(('Yes', 'No'), (1, 0), inplace=True)
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Only keep columns with numbers
