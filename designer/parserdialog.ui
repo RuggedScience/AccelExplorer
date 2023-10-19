@@ -145,6 +145,11 @@
           </item>
           <item>
            <property name="text">
+            <string>utf-8-sig</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>iso-8859-1</string>
            </property>
           </item>
