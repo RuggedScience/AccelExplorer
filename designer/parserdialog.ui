@@ -136,6 +136,27 @@
           </property>
          </widget>
         </item>
+        <item row="5" column="1">
+         <widget class="QComboBox" name="encodingComboBox">
+          <item>
+           <property name="text">
+            <string>utf-8</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>iso-8859-1</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Encoding</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>
@@ -174,7 +195,7 @@
              <x>0</x>
              <y>0</y>
              <width>231</width>
-             <height>152</height>
+             <height>180</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="headerLayout">

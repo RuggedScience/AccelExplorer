@@ -1,4 +1,5 @@
-import linecache
+import csv
+
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -29,6 +30,7 @@ class ParserDialog(QDialog):
         self._skipped_files = set()
 
         self.ui.headerRowSpinBox.valueChanged.connect(self._headerRowChanged)
+        self.ui.encodingComboBox.currentTextChanged.connect(self._update_headers)
         self.ui.csvViewer.lineNumberChanged.connect(self.ui.headerRowSpinBox.setValue)
         self.ui.indexComboBox.currentTextChanged.connect(self._indexChanged)
 
@@ -93,8 +95,19 @@ class ParserDialog(QDialog):
 
     def _get_headers(self, file: Path) -> list[str]:
         lineno = self.ui.headerRowSpinBox.value()
+        encoding = self.ui.encodingComboBox.currentText()
 
-        headers = linecache.getline(str(file), lineno).strip().split(",")
+        line = ''
+        with file.open('r', encoding=encoding) as f:
+            for _ in range(lineno):
+                try:
+                    line = f.readline()
+                except UnicodeDecodeError:
+                    return []
+
+        # Parse the headers using the built in CSV lib
+        reader = csv.reader([line], quoting=csv.QUOTE_MINIMAL)
+        headers = list(reader)[0]
         # Remove blank headers
         return [header for header in headers if header]
 
@@ -155,6 +168,8 @@ class ParserDialog(QDialog):
                 index_col=index,
                 index_type=index_type,
                 sample_rate=sample_rate,
+                quoting=csv.QUOTE_MINIMAL,
+                encoding=self.ui.encodingComboBox.currentText()
             )
             # If we have at least one file parsed
             # we can let the user finish. Otherwise
