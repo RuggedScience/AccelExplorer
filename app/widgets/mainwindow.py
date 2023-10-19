@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         self.ui.markerSize_spin.valueChanged.connect(self._update_markers)
         self.ui.markerCount_spin.valueChanged.connect(self._update_markers)
         # Actions
+        self.ui.actionNew_View.triggered.connect(self._new_view)
         self.ui.actionOpen.triggered.connect(self._open_files)
         self.ui.actionFit_Contents.triggered.connect(self._fit_to_contents)
         self.ui.actionClose.triggered.connect(self._close_current_selection)
@@ -484,6 +485,10 @@ class MainWindow(QMainWindow):
             color = QColorDialog.getColor(series.color, self)
             if color.isValid():
                 series.color = color
+
+    def _new_view(self) -> None:
+        model = ViewModel()
+        controller = self._add_view("New View", model)
 
     def _open_files(self) -> None:
         filters = "Data files ("

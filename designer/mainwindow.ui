@@ -374,6 +374,7 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="actionNew_View"/>
     <addaction name="actionOpen"/>
     <addaction name="actionClose"/>
     <addaction name="actionExport"/>
@@ -505,6 +506,34 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Y</string>
+   </property>
+  </action>
+  <action name="actionNew_View">
+   <property name="text">
+    <string>New View</string>
+   </property>
+   <property name="toolTip">
+    <string>Create a new view</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="actionDelete_Channel">
+   <property name="text">
+    <string>Delete Channel</string>
+   </property>
+   <property name="toolTip">
+    <string>Delete the currently selected channels</string>
+   </property>
+   <property name="shortcut">
+    <string>Del</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::NoRole</enum>
    </property>
   </action>
  </widget>
