@@ -432,6 +432,9 @@ class ViewController(QObject):
         if df.index.inferred_type == "timedelta64":
             x_min = x_min.total_seconds()
             x_max = x_max.total_seconds()
+        elif df.index.inferred_type == "datetime64":
+            x_min = (x_min - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s")
+            x_max = (x_max - pd.Timestamp("1970-01-01")) // pd.Timedelta("1s")
 
         y_min = df.min(axis=1).min()
         y_max = df.max(axis=1).max()

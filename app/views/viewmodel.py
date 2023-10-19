@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from endaq.calc.utils import sample_spacing
 from PySide6.QtCore import QObject, QPointF, QPointFList, Signal
@@ -199,6 +200,8 @@ class ViewModel(QObject):
     def _series_to_points(self, series: pd.Series) -> QPointFList:
         if series.index.inferred_type == "timedelta64":
             series.index = series.index.total_seconds() #type: ignore
+        elif series.index.inferred_type == "datetime64":
+            series.index = series.index.astype(np.int64) // 10**9
 
         series = series.astype(float).dropna()
         points = QPointFList()
