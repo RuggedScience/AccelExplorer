@@ -31,6 +31,7 @@ class ParserDialog(QDialog):
 
         self.ui.headerRowSpinBox.valueChanged.connect(self._headerRowChanged)
         self.ui.encodingComboBox.currentTextChanged.connect(self._update_headers)
+        self.ui.encodingComboBox.currentTextChanged.connect(self._handle_file_changed)
         self.ui.csvViewer.lineNumberChanged.connect(self.ui.headerRowSpinBox.setValue)
         self.ui.indexComboBox.currentTextChanged.connect(self._indexChanged)
 
@@ -62,7 +63,7 @@ class ParserDialog(QDialog):
             f"{self._file_index + 1} / {len(self._files)} - {file.stem}"
         )
 
-        with file.open() as csvfile:
+        with file.open(encoding=self.ui.encodingComboBox.currentText()) as csvfile:
             self.ui.csvViewer.setPlainText(csvfile.read())
 
         self._headerRowChanged(self.ui.headerRowSpinBox.value())
