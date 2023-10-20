@@ -384,7 +384,6 @@
      <string>View</string>
     </property>
     <addaction name="actionFit_Contents"/>
-    <addaction name="actionDelete_Channel"/>
    </widget>
    <widget class="QMenu" name="menuData">
     <property name="title">
@@ -471,6 +470,9 @@
    <property name="toolTip">
     <string>Close all selected views</string>
    </property>
+   <property name="shortcut">
+    <string>Del</string>
+   </property>
   </action>
   <action name="actionFit_Contents">
    <property name="enabled">
@@ -518,20 +520,6 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+N</string>
-   </property>
-   <property name="menuRole">
-    <enum>QAction::NoRole</enum>
-   </property>
-  </action>
-  <action name="actionDelete_Channel">
-   <property name="text">
-    <string>Delete Channel</string>
-   </property>
-   <property name="toolTip">
-    <string>Delete the currently selected channels</string>
-   </property>
-   <property name="shortcut">
-    <string>Del</string>
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>

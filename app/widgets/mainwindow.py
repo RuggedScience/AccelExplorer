@@ -101,7 +101,6 @@ class MainWindow(QMainWindow):
         self.ui.actionCrop.triggered.connect(self._crop_current_view)
         self.ui.actionUndo.triggered.connect(self._undo)
         self.ui.actionRedo.triggered.connect(self._redo)
-        self.ui.actionDelete_Channel.triggered.connect(self._delete_channels)
 
         self.ui.saveDefaults_button.clicked.connect(self._save_chart_settings)
 
@@ -353,17 +352,6 @@ class MainWindow(QMainWindow):
         controller = self.ui.treeWidget.get_current_controller()
         if controller and controller.undo_stack.canRedo():
             controller.undo_stack.redo()
-
-    def _delete_channels(self) -> None:
-        controllers = self.ui.treeWidget.get_selected_controllers()
-        for controller in controllers:
-            model = controller.model
-            if not controller.tree_item.isSelected():
-                for col in model.df:
-                    col = str(col)
-                    if col in controller:
-                        if controller[col].tree_item.isSelected():
-                            model.remove_series(col)
 
     def _update_undo_actions(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
