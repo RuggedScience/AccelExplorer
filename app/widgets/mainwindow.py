@@ -345,21 +345,21 @@ class MainWindow(QMainWindow):
 
     def _undo(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
-        if controller and controller.undo_stack.canUndo():
+        if controller is not None and controller.undo_stack.canUndo():
             controller.undo_stack.undo()
 
     def _redo(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
-        if controller and controller.undo_stack.canRedo():
+        if controller is not None and controller.undo_stack.canRedo():
             controller.undo_stack.redo()
 
     def _update_undo_actions(self) -> None:
         controller = self.ui.treeWidget.get_current_controller()
         self.ui.actionUndo.setEnabled(
-            bool(controller and controller.undo_stack.canUndo())
+            bool(controller is not None and controller.undo_stack.canUndo())
         )
         self.ui.actionRedo.setEnabled(
-            bool(controller and controller.undo_stack.canRedo())
+            bool(controller is not None and controller.undo_stack.canRedo())
         )
 
     def _update_markers(self) -> None:
@@ -431,7 +431,7 @@ class MainWindow(QMainWindow):
         current: ViewController,
         previous: ViewController | None = None,
     ) -> None:
-        if previous:
+        if previous is not None:
             x_axis = previous.x_axis
             y_axis = previous.y_axis
             x_axis.disconnect(self)
@@ -440,7 +440,7 @@ class MainWindow(QMainWindow):
 
         self.ui.chartSettingsWidget.setEnabled((current != None))
 
-        if current:
+        if current is not None:
             self._update_chart_settings()
             x_axis = current.x_axis
             y_axis = current.y_axis
