@@ -157,7 +157,7 @@ class ParserDialog(QDialog):
         index_type = None
         sample_rate = None
         if index == "None":
-            index = None
+            index = False
         elif index == "Sample Rate":
             index = None
             sample_rate = self.ui.sampleRateSpinBox.value()
