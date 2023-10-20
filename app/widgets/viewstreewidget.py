@@ -132,7 +132,7 @@ class ViewsTreeWidget(QTreeWidget):
         if col == 0:
             parent = self._get_root_parent(item)
             controller = self.get_controller(item)
-            if controller:
+            if controller is not None:
                 if parent is item:
                     controller.set_name(item.text(0))
                 elif item in controller:
