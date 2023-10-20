@@ -102,6 +102,7 @@ class ViewsTreeWidget(QTreeWidget):
                 model.add_suffix(f" - {controller.name}")
                 self._drag_model.merge(model)
             event.acceptProposedAction()
+            self.collapseAll()
 
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
         super().dragMoveEvent(event)
