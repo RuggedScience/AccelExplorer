@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsSceneMouseEvent
-from PySide6.QtCore import QPointF, QRectF, QRect, Qt
-from PySide6.QtGui import QFont, QPainterPath, QColor, QFontMetrics
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QFont, QPainterPath, QColor, QFontMetrics, QPen
 
 if TYPE_CHECKING:
     from PySide6.QtCharts import QChart
@@ -19,6 +19,7 @@ class Callout(QGraphicsItem):
         self._rect = QRectF()
         self._custom_offset = None
         self.delete = False
+        self.setZValue(11)
 
     @property
     def anchor(self) -> QPointF:
@@ -109,6 +110,7 @@ class Callout(QGraphicsItem):
             path.lineTo(point2)
             path = path.simplified()
 
+        painter.setRenderHint(painter.RenderHint.Antialiasing)
         painter.setBrush(QColor(255, 255, 255))
         painter.drawPath(path)
         painter.drawText(self._textRect, self._text)
@@ -133,19 +135,25 @@ class Callout(QGraphicsItem):
         self.setPos(self.anchor + offset)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        event.setAccepted(True)
+        if self._rect.contains(event.pos()):
+            event.setAccepted(True)
+        else:
+            event.setAccepted(False)
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        if event.buttons() & Qt.MouseButton.LeftButton:
+        if event.buttons() == Qt.MouseButton.LeftButton and self._rect.contains(event.pos()):
             pos = self.mapToParent(event.pos() - event.buttonDownPos(Qt.MouseButton.LeftButton))
             self._custom_offset = pos - self.anchor
 
             self.setPos(pos)
-        event.setAccepted(True)
-        # else:
-        # event.setAccepted(False)
+            event.setAccepted(True)
+        else:
+            event.setAccepted(False)
 
     def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        self.hide()
-        self.delete = True
-        return super().mouseDoubleClickEvent(event)
+        if self._rect.contains(event.pos()):
+            self.hide()
+            self.delete = True
+            event.setAccepted(True)
+        else:
+            event.setAccepted(False)

@@ -26,7 +26,7 @@ class InteractiveChart(QChartView):
 
         self._callouts: list[Callout] = []
 
-        self._tool_tip = self.add_callout(QPointF(0, 0), "")
+        self._tool_tip = Callout(self.chart())
         self._tool_tip.hide()
 
         self._last_mouse_pos = None
@@ -43,14 +43,14 @@ class InteractiveChart(QChartView):
         self._tool_tip.show()
 
     def keep_tooltip(self) -> None:
-        self._tool_tip = self.add_callout(QPointF(0, 0), "")
+        self._callouts.append(self._tool_tip)
+        self._tool_tip = Callout(self.chart())
         self._tool_tip.hide()
 
     def add_callout(self, pos: "QPointF", text: str) -> Callout:
         callout = Callout(self.chart())
         callout.set_text(text)
         callout.set_anchor(pos)
-        callout.setZValue(11)
         callout.update_geometry()
         callout.show()
         self._callouts.append(callout)
@@ -104,10 +104,9 @@ class InteractiveChart(QChartView):
         ):
             QApplication.setOverrideCursor(QCursor(Qt.CursorShape.SizeAllCursor))
             self._last_mouse_pos = event.pos()
-            event.accept()
+            event.setAccepted(True)
         else:
-            QApplication.restoreOverrideCursor()
-            return super().mousePressEvent(event)
+            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if event.buttons() & Qt.MouseButton.MiddleButton or (
@@ -123,9 +122,10 @@ class InteractiveChart(QChartView):
 
             self._last_mouse_pos = event.pos()
             self._update_callouts()
+            event.setAccepted(True)
         else:
             QApplication.restoreOverrideCursor()
-            return super().mouseMoveEvent(event)
+            super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._last_mouse_pos = None
@@ -154,10 +154,6 @@ class InteractiveChart(QChartView):
         for callout in self._callouts:
             if callout.delete:
                 callout.scene().removeItem(callout)
-                continue
-                # This causes a crash when a tooltip is saved and then deleted.
-                # TODO: Figure out WHY!
-                # self.scene().removeItem(callout)
             else:
                 callout.update_geometry()
                 callouts.append(callout)

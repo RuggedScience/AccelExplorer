@@ -388,6 +388,8 @@ class ViewController(QObject):
     ) -> None:
         self._x_axis.setRange(x_min, x_max)
         self._y_axis.setRange(y_min, y_max)
+        #TODO: Find a better way...
+        self._chart_view._update_callouts()
 
     def crop(self) -> None:
         x_min = self._x_axis.min()
@@ -451,10 +453,10 @@ class ViewController(QObject):
     def _point_hovered(self, pos: QPointF, state: bool) -> None:
         if state:
             sender = self.sender()
+            series_name = ""
             if isinstance(sender, QLineSeries):
                 series_name = sender.name() + "\n"
-            else:
-                series_name = ""
+
             x_title = self.chart.axisX().titleText() or 'X'
             y_title = self.chart.axisY().titleText() or 'Y'
             self.chart_view.show_tooltip(
@@ -476,7 +478,7 @@ class ViewController(QObject):
         chart_series.attachAxis(self._x_axis)
         chart_series.attachAxis(self._y_axis)
         chart_series.hovered.connect(self._point_hovered)
-        chart_series.clicked.connect(self.chart_view.keep_tooltip)
+        chart_series.doubleClicked.connect(self.chart_view.keep_tooltip)
 
         tree_item = view_series.tree_item
         tree_item.setCheckState(0, Qt.CheckState.Checked)
