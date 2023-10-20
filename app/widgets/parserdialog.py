@@ -64,7 +64,11 @@ class ParserDialog(QDialog):
         )
 
         with file.open(encoding=self.ui.encodingComboBox.currentText()) as csvfile:
-            self.ui.csvViewer.setPlainText(csvfile.read())
+            # Handle wrong encoding
+            try:
+                self.ui.csvViewer.setPlainText(csvfile.read())
+            except UnicodeDecodeError:
+                pass
 
         self._headerRowChanged(self.ui.headerRowSpinBox.value())
 
