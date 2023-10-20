@@ -21,40 +21,35 @@ class InteractiveChart(QChartView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setRubberBand(
-            QChartView.RubberBand.RectangleRubberBand | QChartView.RubberBand.ClickThroughRubberBand
+            QChartView.RubberBand.RectangleRubberBand
+            | QChartView.RubberBand.ClickThroughRubberBand
         )
 
         self._callouts: list[Callout] = []
 
         self._tool_tip = Callout(self.chart())
         self._tool_tip.hide()
+        self._tool_tip.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
         self._last_mouse_pos = None
-        self._old_plot_area = None
 
     @property
     def tooltip(self) -> Callout:
         return self._tool_tip
 
-    def show_tooltip(self, pos: "QPointF", text: str) -> None:
-        self._tool_tip.set_anchor(pos)
+    def show_tooltip(self, pos: QPointF, text: str) -> None:
         self._tool_tip.set_text(text)
-        self._tool_tip.update_geometry()
+        self._tool_tip.set_anchor(pos)
         self._tool_tip.show()
 
     def keep_tooltip(self) -> None:
+        self._tool_tip.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
+        self._tool_tip.show_anchor = True
         self._callouts.append(self._tool_tip)
+
         self._tool_tip = Callout(self.chart())
         self._tool_tip.hide()
-
-    def add_callout(self, pos: "QPointF", text: str) -> Callout:
-        callout = Callout(self.chart())
-        callout.set_text(text)
-        callout.set_anchor(pos)
-        callout.update_geometry()
-        callout.show()
-        self._callouts.append(callout)
-        return callout
+        self._tool_tip.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
     def _zoom(self, rect: QRectF) -> None:
         self.chart().zoomIn(rect)
@@ -86,7 +81,10 @@ class InteractiveChart(QChartView):
             else:
                 factor = 0.5
 
-            if self.rubberBand() & QChartView.RubberBand.RectangleRubberBand == QChartView.RubberBand.RectangleRubberBand:
+            if (
+                self.rubberBand() & QChartView.RubberBand.RectangleRubberBand
+                == QChartView.RubberBand.RectangleRubberBand
+            ):
                 self.chart().zoom(factor)
             else:
                 if self.rubberBand() & QChartView.RubberBand.HorizontalRubberBand:

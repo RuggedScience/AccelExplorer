@@ -15,6 +15,7 @@ class Callout(QGraphicsItem):
         self._text = ""
         self._textRect = QRectF()
         self._anchor = QPointF()
+        self._show_anchor = False
         self._font = QFont()
         self._rect = QRectF()
         self._custom_offset = None
@@ -25,6 +26,15 @@ class Callout(QGraphicsItem):
     def anchor(self) -> QPointF:
         return self._chart.mapToPosition(self._anchor)
 
+    @property
+    def show_anchor(self) -> bool:
+        return self._show_anchor
+    
+    @show_anchor.setter
+    def show_anchor(self, show: bool) -> None:
+        self._show_anchor = show
+        self.update()
+
     def boundingRect(self) -> QRectF:
         anchor = self.mapFromParent(self.anchor)
         rect = QRectF()
@@ -32,14 +42,13 @@ class Callout(QGraphicsItem):
         rect.setRight(max(self._rect.right(), anchor.x()))
         rect.setTop(min(self._rect.top(), anchor.y()))
         rect.setBottom(max(self._rect.bottom(), anchor.y()))
-
         return rect
 
     def paint(self, painter, option, widget) -> None:
         path = QPainterPath()
         path.addRoundedRect(self._rect, 5, 5)
         anchor = self.mapFromParent(self.anchor)
-        if not self._rect.contains(anchor) and not self._anchor.isNull():
+        if self._show_anchor and not self._rect.contains(anchor) and not self._anchor.isNull():
             point1 = QPointF()
             point2 = QPointF()
 
@@ -121,17 +130,21 @@ class Callout(QGraphicsItem):
         boundingRect = metrics.boundingRect(0, 0, 150, 150, Qt.AlignmentFlag.AlignLeft, self._text) #type: ignore
         self._textRect = QRectF(boundingRect)
         self._textRect.translate(5, 5)
-        self.prepareGeometryChange()
         self._rect = self._textRect.adjusted(-5, -5, 5, 5)
+        self.update_geometry()
 
     def set_anchor(self, point: QPointF) -> None:
         self._anchor = point
+        self.update_geometry()
 
     def update_geometry(self) -> None:
         self.prepareGeometryChange()
-        offset = QPointF(10, -50)
+    
         if self._custom_offset:
             offset = self._custom_offset
+        else:
+            offset = QPointF(0, -self._rect.height() - 10)
+
         self.setPos(self.anchor + offset)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:

@@ -450,21 +450,27 @@ class ViewController(QObject):
         if color != series.color:
             series.color = color
 
+    def _generate_tooltip_text(self, pos: QPointF) -> str:
+        name = ""
+        sender = self.sender()
+        if isinstance(sender, QLineSeries):
+            name = sender.name() + "\n"
+
+        x_title = self.chart.axisX().titleText() or 'X'
+        y_title = self.chart.axisY().titleText() or 'Y'
+        return f"{name}{x_title}: {pos.x():.2f}\n{y_title}: {pos.y():.2f}"
+
     def _point_hovered(self, pos: QPointF, state: bool) -> None:
         if state:
-            sender = self.sender()
-            series_name = ""
-            if isinstance(sender, QLineSeries):
-                series_name = sender.name() + "\n"
-
-            x_title = self.chart.axisX().titleText() or 'X'
-            y_title = self.chart.axisY().titleText() or 'Y'
-            self.chart_view.show_tooltip(
-                pos,
-                f"{series_name}{x_title}: {pos.x():.2f}\n{y_title}: {pos.y():.2f}",
-            )
+            tooltip_text = self._generate_tooltip_text(pos)
+            self.chart_view.show_tooltip(pos, tooltip_text)
         else:
             self.chart_view.tooltip.hide()
+
+    def _point_double_clicked(self, pos: QPointF):
+        #tooltip_text = self._generate_tooltip_text(pos)
+        #self.chart_view.show_tooltip(pos, tooltip_text)
+        self.chart_view.keep_tooltip()
 
     def _add_series(self, name: str) -> ViewSeries:
         view_series = ViewSeries(name, parent=self)
@@ -478,7 +484,7 @@ class ViewController(QObject):
         chart_series.attachAxis(self._x_axis)
         chart_series.attachAxis(self._y_axis)
         chart_series.hovered.connect(self._point_hovered)
-        chart_series.doubleClicked.connect(self.chart_view.keep_tooltip)
+        chart_series.doubleClicked.connect(self._point_double_clicked)
 
         tree_item = view_series.tree_item
         tree_item.setCheckState(0, Qt.CheckState.Checked)
