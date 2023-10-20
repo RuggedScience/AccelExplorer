@@ -1,0 +1,9 @@
+[Core]
+Name = HWiNFO Parser
+Module = hwinfoparser
+
+[Documentation]
+Author = Timothy Lassiter
+Version = 0.1
+Description = Parse CSV files genereated HWiNFO
+Website = N/A
