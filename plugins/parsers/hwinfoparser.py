@@ -25,7 +25,13 @@ class HWiNFOParser(parserplugins.CSVParser):
             )
         except ValueError as e:
             raise parserplugins.ParseError("Missing Date/Time columns")
-        return ViewModel(df, y_axis="")
+        
+        index = df.index
+        index = index - index[0]
+        df.set_index(index, inplace=True)
+        df.index.rename("Time (s)", inplace=True)
+
+        return ViewModel(df, y_axis="", x_axis="Time(S)")
 
     def _get_headers(self, file: Path) -> list[str]:
         line = ""
