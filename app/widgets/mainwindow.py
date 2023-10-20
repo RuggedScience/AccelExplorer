@@ -489,6 +489,7 @@ class MainWindow(QMainWindow):
     def _new_view(self) -> None:
         model = ViewModel()
         controller = self._add_view("New View", model)
+        self.ui.treeWidget.editItem(controller.tree_item)
 
     def _open_files(self) -> None:
         filters = "Data files ("
