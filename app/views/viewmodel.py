@@ -187,11 +187,11 @@ class ViewModel(QObject):
             self.name_changed.emit(old, new)
 
     def _update_sample_rate(self) -> None:
-        spacing = sample_spacing(self._df)
-        if self.index_type == "timedelta64" and spacing:
-            sample_rate = int(1 / spacing)
-        else:
-            sample_rate = 0
+        sample_rate = 0
+        if self.index_type == "timedelta64":
+            spacing = sample_spacing(self._df)
+            if spacing:
+                sample_rate = int(1 / spacing)
 
         if sample_rate != self._sample_rate:
             self._sample_rate = sample_rate
